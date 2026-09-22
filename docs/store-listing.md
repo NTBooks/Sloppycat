@@ -84,6 +84,25 @@ creditworthiness.
 - Screenshots, 1280×800: `docs/store/` (at least one required, up to five)
 - Small promo tile, 440×280: optional, only needed for featuring
 
+## The account
+
+The developer account is an ordinary Google account: a personal Gmail or a Workspace account on a domain you
+own. A YouTube Brand Account cannot be used, because Brand Accounts have been limited to YouTube since 2021.
+There is no "channel" concept in the Web Store.
+
+Two things worth settling before paying the fee, because both are awkward to change later:
+
+- **The contact email is shown publicly**, under the contact information on every extension you publish. Use
+  an address made for this, not a personal one. A Workspace alias on a domain you own is tidiest and opens
+  the verified-publisher route, where the store can display your site instead of a name.
+- **The publisher display name** appears under the title of each extension and is separate from the account
+  address, so the listing can say Sloppycat without exposing whose account it is. It is not easily changed
+  once published.
+
+The $5 fee is per account, so publishing from a fresh account later means paying it again. Group publisher
+accounts exist for sharing or transferring ownership of an item without handing over the account itself,
+which is the route to take if this ever needs to outlive one person's Gmail.
+
 ## Publishing an alpha
 
 Visibility lives in the Distribution tab:
