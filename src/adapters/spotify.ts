@@ -19,6 +19,8 @@ export const spotify: Adapter = {
   },
   profileUrl: (id) => `https://open.spotify.com/artist/${id}`,
   itemUrl: (id) => `https://open.spotify.com/album/${id}`,
+  // The artist page gives the ten newest of each kind; this view has the lot.
+  fullCatalogUrl: (profileId) => `https://open.spotify.com/artist/${profileId}/discography/all`,
   async fetchSnapshot(profileId, ctx) {
     // One page load gives items and bio together.
     return ctx.render(`https://open.spotify.com/artist/${profileId}`, "spotify", profileId);

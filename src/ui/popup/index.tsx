@@ -2,7 +2,7 @@ import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { Button, RunPanel } from "../shared/components";
 import { useRun, useStorage } from "../shared/hooks";
-import { send } from "../shared/rpc";
+import { send, openPage} from "../shared/rpc";
 import { detectProfile } from "../../adapters";
 import { PLATFORM_LABEL, type Platform } from "../../types";
 
@@ -105,11 +105,11 @@ function Popup() {
       </div>
 
       <div class="row">
-        <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/following/index.html") })} title="Every page you watch, with links to each">
+        <Button onClick={() => void openPage("ui/following/index.html")} title="Every page you watch, with links to each">
           Following{nProfiles ? ` (${nProfiles})` : ""}
         </Button>
-        <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/alert/index.html") })}>Alerts</Button>
-        <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/changes/index.html") })} title="What the lists you subscribe to changed">
+        <Button onClick={() => void openPage("ui/alert/index.html")}>Alerts</Button>
+        <Button onClick={() => void openPage("ui/changes/index.html")} title="What the lists you subscribe to changed">
           Lists{unseen ? ` (${unseen})` : ""}
         </Button>
         <Button onClick={() => void chrome.runtime.openOptionsPage()}>Settings</Button>
@@ -121,7 +121,7 @@ function Popup() {
           {run.running ? "Checking…" : "Check now"}
         </Button>
         {settings?.experiments.slopscan && (
-          <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/scan/index.html") })}>Slopscan</Button>
+          <Button onClick={() => void openPage("ui/scan/index.html")}>Slopscan</Button>
         )}
       </div>
       <RunPanel run={run} compact />

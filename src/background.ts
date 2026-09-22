@@ -38,7 +38,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   await ensureDefaultSources();
   await scheduleAlarms();
   if (details.reason === "install") {
-    await chrome.tabs.create({ url: chrome.runtime.getURL("ui/onboard/index.html") });
+    await openPage("ui/onboard/index.html");
   }
 });
 chrome.runtime.onStartup.addListener(async () => {
@@ -58,6 +58,26 @@ async function refreshLists(): Promise<void> {
 }
 
 storage.onChange(["settings"], () => void scheduleAlarms());
+
+/**
+ * Show one of the extension's own pages, reusing the tab it is already in. A notification per check
+ * opening a tab per click is how you end up with nine copies of the alerts page.
+ */
+async function openPage(path: string): Promise<void> {
+  const [file, hash] = path.split("#");
+  const url = chrome.runtime.getURL(file!);
+  try {
+    const existing = (await chrome.tabs.query({ url })).find((t) => t.id !== undefined);
+    if (existing?.id !== undefined) {
+      await chrome.tabs.update(existing.id, { active: true, ...(hash ? { url: `${url}#${hash}` } : {}) });
+      if (existing.windowId !== undefined) await chrome.windows.update(existing.windowId, { focused: true });
+      return;
+    }
+  } catch {
+    /* falling through opens a new tab, which is the old behaviour */
+  }
+  await chrome.tabs.create({ url: hash ? `${url}#${hash}` : url });
+}
 
 // ---------- run commentary ----------
 
@@ -739,11 +759,11 @@ async function notifyListChanges(changes: ListChange[]): Promise<void> {
 chrome.notifications.onClicked.addListener((id) => {
   if (id.startsWith("lists:")) {
     const changeId = id.slice(6);
-    void chrome.tabs.create({ url: chrome.runtime.getURL(`ui/changes/index.html${changeId ? `#${changeId}` : ""}`) });
+    void openPage(`ui/changes/index.html${changeId ? `#${changeId}` : ""}`);
     return;
   }
   const alertId = id.startsWith("alert:") ? id.slice(6) : "";
-  void chrome.tabs.create({ url: chrome.runtime.getURL(`ui/alert/index.html${alertId ? `#${alertId}` : ""}`) });
+  void openPage(`ui/alert/index.html${alertId ? `#${alertId}` : ""}`);
 });
 
 // ---------- claim checking ----------
@@ -934,6 +954,19 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
           return { ok: true, detected: det, result };
         });
       }
+      case "snapshot:full": {
+        // The "open it and scroll to the bottom yourself" instruction, done by the extension. The
+        // full view is loaded in the background window and paged through like any other page.
+        const m = msg as Extract<Message, { type: "snapshot:full" }>;
+        const adapter = adapterFor(m.platform);
+        const url = adapter.fullCatalogUrl?.(m.profileId);
+        if (!url) return { ok: false, error: `${adapter.label} has no separate full-catalogue page` };
+        return activity(`Reading the full ${adapter.label} catalogue`, async () => {
+          const result = await render(url, m.platform, m.profileId);
+          await log(`Found ${result.items.length} release${result.items.length === 1 ? "" : "s"} in the full catalogue`);
+          return { ok: true, result };
+        });
+      }
       case "scan:collect": {
         const m = msg as Extract<Message, { type: "scan:collect" }>;
         const [res] = await chrome.scripting.executeScript({
@@ -1068,7 +1101,7 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
       case "open:onboard": {
         const m = msg as Extract<Message, { type: "open:onboard" }>;
         const q = m.platform && m.profileId ? `?platform=${m.platform}&profileId=${encodeURIComponent(m.profileId)}` : "";
-        await chrome.tabs.create({ url: chrome.runtime.getURL(`ui/onboard/index.html${q}`) });
+        await openPage(`ui/onboard/index.html${q}`);
         return { ok: true };
       }
       case "offscreen:parse":

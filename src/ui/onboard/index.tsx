@@ -6,7 +6,7 @@ import { render } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { Button, Chip, CopyButton, Empty, RunPanel, SignalChips } from "../shared/components";
 import { useRun, useStorage } from "../shared/hooks";
-import { download, send } from "../shared/rpc";
+import { download, send, openPage} from "../shared/rpc";
 import type { ExtractResult, ItemKind, Platform, Profile, SnapshotItem } from "../../types";
 import { PLATFORM_LABEL } from "../../types";
 import { adapterFor, detectProfile } from "../../adapters";
@@ -110,6 +110,7 @@ function Wizard() {
   const [detected, setDetected] = useState<{ platform: Platform; profileId: string; url: string } | null>(null);
   const [result, setResult] = useState<ExtractResult | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
+  const [fullMsg, setFullMsg] = useState("");
   const [settings, setSettings] = useStorage("settings");
   const [myList] = useStorage("myList");
   const [listTitle, setListTitle] = useState("");
@@ -148,6 +149,36 @@ function Wizard() {
       disclosure: serializeDisclosure(myList?.mine.find((r) => r.platform === res.platform && r.id === item.itemId)?.disclosure) || defaults,
       note: myList?.notMine.find((r) => r.platform === res.platform && r.id === item.itemId)?.note ?? "",
     }));
+  }
+
+  /**
+   * Read the platform's full-catalogue view and fold it into what is already on screen.
+   *
+   * The notice used to say "open it, scroll to the bottom, then snapshot again", which is three
+   * manual steps and loses every decision already made on this screen. Existing rows keep their
+   * ticks and notes; only the ones the first pass never saw are added.
+   */
+  async function scanFullCatalog() {
+    if (!detected) return;
+    setBusy("full");
+    setError("");
+    try {
+      const r = await send<{ ok: boolean; error?: string; result?: ExtractResult }>({
+        type: "snapshot:full",
+        platform: detected.platform,
+        profileId: detected.profileId,
+      });
+      if (!r.ok || !r.result) throw new Error(r.error ?? "Could not read the full catalogue");
+      const known = new Set(rows.map((x) => x.item.itemId));
+      const fresh = toRows({ ...r.result, items: r.result.items.filter((i) => !known.has(i.itemId)) }, serializeDisclosure(settings?.defaultDisclosure));
+      setRows([...rows, ...fresh]);
+      setResult({ ...r.result, items: [...rows.map((x) => x.item), ...fresh.map((x) => x.item)], partial: false });
+      setFullMsg(fresh.length ? `Added ${fresh.length} more release${fresh.length === 1 ? "" : "s"}.` : "Nothing new: the first pass already had everything.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
   }
 
   async function snapshotTab(tabId: number) {
@@ -201,6 +232,13 @@ function Wizard() {
       setBusy("");
     }
   }
+
+  // What the platform claims against what is actually on screen. The old wording promised "the ten
+  // newest", which stops being true the moment paging works, and it did.
+  const listedCount = rows.filter((r) => r.item.kind !== "appears_on").length;
+  const counts = result?.counts;
+  const summed = counts ? (counts["albums"] ?? 0) + (counts["singles"] ?? 0) + (counts["compilations"] ?? 0) : 0;
+  const reportedTotal = counts?.["all"] ?? (summed || undefined);
 
   const grouped = useMemo(() => {
     const g = new Map<ItemKind, number[]>();
@@ -417,17 +455,30 @@ function Wizard() {
               </div>
             )}
           </div>
-          {result.partial && (
-            <div class="notice">
-              Spotify's artist page only gives up the ten newest albums and ten newest singles, and it says there are
-              more than that. Open{" "}
-              <a href={`${detected.url}/discography/all`} target="_blank" rel="noreferrer">
-                {fan ? "their full discography" : "your full discography"}
-              </a>
-              {fan ? "" : " while signed in"}, scroll to the bottom, then snapshot again to catch the rest. Worth doing: a fake can be
-              uploaded with an old date, which puts it in the middle of the catalog rather than at the top.
+          {result.partial && adapterFor(detected.platform).fullCatalogUrl && (
+            <div class="notice stack">
+              <div>
+                {reportedTotal
+                  ? `${PLATFORM_LABEL[detected.platform]} reports ${reportedTotal} releases on this profile and ${listedCount} are listed here.`
+                  : `${PLATFORM_LABEL[detected.platform]} says there are more releases than it listed here.`}{" "}
+                Worth reading the rest: a fake can be uploaded with an old date, which puts it in the middle of the catalog
+                rather than at the top, where a newest-first page never reaches it.
+              </div>
+              <div class="row">
+                <Button kind="primary" disabled={busy === "full"} onClick={() => void scanFullCatalog()}>
+                  {busy === "full" ? "Reading the full discography…" : "Scan the full discography"}
+                </Button>
+                <a class="muted" style="font-size:12px" href={adapterFor(detected.platform).fullCatalogUrl!(detected.profileId)} target="_blank" rel="noreferrer">
+                  or open it yourself
+                </a>
+              </div>
+              <div class="muted" style="font-size:12px">
+                This opens the full view in the background window and reads it. Anything already ticked above stays as you
+                left it.
+              </div>
             </div>
           )}
+          {fullMsg && <div class="notice ok">{fullMsg}</div>}
           {rows.length === 0 && <Empty>Nothing was found on this page. If it's a Spotify artist page, try the "…/discography/all" view.</Empty>}
           {grouped.map((g) => (
             <details class="card group" key={g.kind} open={!OFF_BY_DEFAULT.has(g.kind)}>
@@ -770,10 +821,10 @@ function Wizard() {
             >
               Follow another page
             </Button>
-            <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/following/index.html") })}>
+            <Button onClick={() => void openPage("ui/following/index.html")}>
               Everyone you follow
             </Button>
-            <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/alert/index.html") })}>Alerts</Button>
+            <Button onClick={() => void openPage("ui/alert/index.html")}>Alerts</Button>
             <Button onClick={() => void chrome.runtime.openOptionsPage()}>Open settings</Button>
           </div>
         </div>
@@ -800,7 +851,7 @@ function Wizard() {
               Snapshot another profile
             </Button>
             <Button onClick={() => void chrome.runtime.openOptionsPage()}>Open settings</Button>
-            <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/alert/index.html") })}>Alerts</Button>
+            <Button onClick={() => void openPage("ui/alert/index.html")}>Alerts</Button>
           </div>
         </div>
       )}

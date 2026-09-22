@@ -29,3 +29,30 @@ export async function copy(text: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Show one of the extension's own pages, reusing the tab it is already in.
+ *
+ * These are places, not documents: there is only ever one Following page, one Alerts page. Opening
+ * a new tab each time buries the browser in duplicates of the same thing, so an existing one is
+ * brought forward instead, along with the window it lives in.
+ *
+ * @param path e.g. "ui/alert/index.html", optionally with a #fragment to jump to.
+ */
+export async function openPage(path: string): Promise<void> {
+  const [file, hash] = path.split("#");
+  const url = chrome.runtime.getURL(file!);
+  try {
+    // Match on the file, not the fragment, so a deep link lands in the page already open.
+    const existing = (await chrome.tabs.query({ url })).find((t) => t.id !== undefined);
+    if (existing?.id !== undefined) {
+      await chrome.tabs.update(existing.id, { active: true, ...(hash ? { url: `${url}#${hash}` } : {}) });
+      if (existing.windowId !== undefined) await chrome.windows.update(existing.windowId, { focused: true });
+      return;
+    }
+  } catch {
+    // tabs.query needs the tabs permission and a valid pattern; falling through opens a new one,
+    // which is the old behaviour and never worse.
+  }
+  await chrome.tabs.create({ url: hash ? `${url}#${hash}` : url });
+}

@@ -13,6 +13,11 @@ export interface Adapter {
   label: string;
   /** How this adapter gets data. Informational; shown in the UI. */
   strategy: "json" | "ssr" | "render";
+  /**
+   * A page that lists the whole catalogue, where the profile page only shows the newest of it.
+   * Undefined when the profile page is already complete.
+   */
+  fullCatalogUrl?(profileId: string): string;
   /** Can the extractor read a bio/about text that a creator controls? Needed for claim verification. */
   supportsBio: boolean;
   parseProfileUrl(url: string): { profileId: string; url: string } | null;

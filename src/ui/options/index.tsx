@@ -3,7 +3,7 @@ import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { Button, Chip, CopyButton, Empty, RunPanel } from "../shared/components";
 import { useRun, useStorage } from "../shared/hooks";
-import { download, fmtDate, send } from "../shared/rpc";
+import { download, fmtDate, send, openPage} from "../shared/rpc";
 import { PLATFORM_LABEL } from "../../types";
 import { adapterFor } from "../../adapters";
 import { serializeList, parseDisclosure, serializeDisclosure } from "../../lists/format";
@@ -243,7 +243,7 @@ function Experimental() {
       </Row>
       {x.slopscan && (
         <div class="row">
-          <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/scan/index.html") })}>Open Slopscan</Button>
+          <Button onClick={() => void openPage("ui/scan/index.html")}>Open Slopscan</Button>
         </div>
       )}
     </section>
@@ -514,7 +514,7 @@ function Sources() {
           Add
         </Button>
         <Button onClick={() => void send({ type: "lists:refresh" })}>Refresh all</Button>
-        <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/changes/index.html") })}>
+        <Button onClick={() => void openPage("ui/changes/index.html")}>
           What changed{unseen ? ` (${unseen})` : ""}
         </Button>
       </form>

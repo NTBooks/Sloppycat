@@ -102,10 +102,16 @@ window.chrome = {
     onChanged: { addListener: (f) => listeners.push(f), removeListener: (f) => listeners.splice(listeners.indexOf(f), 1) }
   },
   tabs: {
-    query: async () => [{ id: 1, url: "https://open.spotify.com/artist/3yY2gUcIsjMr8hjo51PoJ8", title: "The Smiths | Spotify" }],
+    // Filtered, so openPage's "is this page already open?" check behaves like the real one.
+    query: async (q) => {
+      const all = [{ id: 1, url: "https://open.spotify.com/artist/3yY2gUcIsjMr8hjo51PoJ8", title: "The Smiths | Spotify", windowId: 1 }];
+      return q?.url ? all.filter((t) => t.url === q.url) : all;
+    },
+    update: async (id, props) => { console.log("tabs.update", id, props); return { id }; },
     get: async () => ({ id: 1, url: "https://open.spotify.com/artist/3yY2gUcIsjMr8hjo51PoJ8" }),
     create: async ({ url }) => { console.log("tabs.create", url); return { id: 2 }; }
   },
+  windows: { update: async (id, props) => { console.log("windows.update", id, props); return { id }; } },
   notifications: { create: async () => "n1", onClicked: { addListener() {} } },
   alarms: { create: async () => {}, get: async () => undefined, onAlarm: { addListener() {} } }
 };
