@@ -1,6 +1,6 @@
 // Heuristic signals attached to alerts. Relative to the creator's own history, never absolute verdicts.
 import type { Signal, SnapshotItem } from "./types";
-import { isLookalike, similarity } from "./lookalike";
+import { isCompanionTitle, isLookalike, similarity } from "./lookalike";
 
 /** DistroKid's auto-assigned placeholder label, e.g. "8412 Records DK". */
 export const DISTRIBUTOR_PLACEHOLDER = /\b\d{3,7}\s+Records\s+DK\b/i;
@@ -87,7 +87,10 @@ export function lookalikeSignal(
     if (!best || score > best.score) best = { title: w.title, score };
   }
   if (best && isLookalike(candidate.title, best.title)) {
-    return { kind: "lookalike", ofTitle: best.title, score: Math.round(best.score * 100) / 100 };
+    // Say which rule caught it. A companion title can sit below the score threshold and still be
+    // the clearest case there is, and "80% match" would not explain why it is here.
+    const companion = isCompanionTitle(candidate.title, best.title);
+    return { kind: "lookalike", ofTitle: best.title, score: Math.round(best.score * 100) / 100, companion };
   }
   return null;
 }
@@ -101,7 +104,9 @@ export function describeSignal(s: Signal): string {
     case "indie_zero_reviews":
       return "Independently published with no reviews";
     case "lookalike":
-      return `Title resembles "${s.ofTitle}" (${Math.round(s.score * 100)}% match)`;
+      return s.companion
+        ? `Keeps your title "${s.ofTitle}" whole and adds the wording a summary or study-guide edition uses`
+        : `Title resembles "${s.ofTitle}" (${Math.round(s.score * 100)}% match)`;
     case "released_after":
       return `Released after "${s.watchedTitle}" (${s.watchedDate})`;
     case "count_drift":

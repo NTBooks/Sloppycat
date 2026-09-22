@@ -113,7 +113,7 @@ export type Signal =
   | { kind: "first_time_label"; label: string; knownLabels: string[] }
   | { kind: "distributor_placeholder"; label: string }
   | { kind: "indie_zero_reviews" }
-  | { kind: "lookalike"; ofTitle: string; score: number }
+  | { kind: "lookalike"; ofTitle: string; score: number; companion?: boolean }
   | { kind: "released_after"; watchedTitle: string; watchedDate: string }
   | { kind: "count_drift"; category: string; added: number; seen: number };
 

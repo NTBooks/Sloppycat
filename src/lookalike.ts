@@ -61,7 +61,70 @@ export function similarity(a: string, b: string): number {
 
 export const DEFAULT_LOOKALIKE_THRESHOLD = 0.82;
 
+/**
+ * The vocabulary a derivative title is padded with. A clone of this kind does not disguise itself:
+ * it keeps the original title whole, so buyers searching for the real book find it, and bolts on
+ * wording that makes it sound like an accompaniment.
+ *
+ * Only ever applied to the words a candidate adds *beyond* the whole watched title, so an author
+ * whose own title contains "Guide" or "Notes" is unaffected.
+ */
+const COMPANION = new Set([
+  "summary",
+  "summaries",
+  "analysis",
+  "analyses",
+  "study",
+  "guide",
+  "guides",
+  "workbook",
+  "workbooks",
+  "companion",
+  "takeaways",
+  "insights",
+  "sparknotes",
+  "cliffsnotes",
+  "cliffnotes",
+  "notes",
+  "digest",
+  "abridged",
+  "unofficial",
+  "unauthorized",
+  "unauthorised",
+  "recap",
+  "breakdown",
+  "explained",
+  "trivia",
+  "quiz",
+  "discussion",
+  "questions",
+  "starters",
+  "lessons",
+  "review",
+  "reviews",
+]);
+
+/**
+ * Does the candidate keep the whole watched title and add companion wording to it?
+ *
+ * This exists because the blended score cannot see it on a short title. Containment is worth 0.7
+ * and the Jaccard term makes up the rest, so the shorter the original, the more the padding costs:
+ * a one-word title like "Texis" scores 0.80 against "Texis: Summary & Analysis" and slips under the
+ * threshold, which is precisely the pattern the threshold exists to catch. Raising the threshold
+ * for everyone would pull in real coincidences instead, so the pattern is named rather than scored.
+ */
+export function isCompanionTitle(candidate: string, watched: string): boolean {
+  const want = tokens(watched);
+  const got = tokens(candidate);
+  if (!want.length || got.length <= want.length) return false;
+  const have = new Set(got);
+  if (!want.every((t) => have.has(t))) return false;
+  const original = new Set(want);
+  return got.some((t) => !original.has(t) && COMPANION.has(t));
+}
+
 export function isLookalike(candidate: string, watched: string, threshold = DEFAULT_LOOKALIKE_THRESHOLD): boolean {
   if (normalizeTitle(candidate) === normalizeTitle(watched)) return true;
+  if (isCompanionTitle(candidate, watched)) return true;
   return similarity(candidate, watched) >= threshold;
 }
