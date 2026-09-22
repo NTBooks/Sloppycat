@@ -68,7 +68,16 @@ The failure mode that kills the project is calling a real release fake. So:
 - **Anyone can be removed on request**, including from the roster, no questions asked.
 - A creator's list, once verified, is the source of truth we cite in the report card.
 
-## Open question
+## Deferred: classifier-assisted triage
 
-The note mentions using "Jev" for some of this. I don't know what that is, so I've left it out of the job
-design. Tell me what it is and I'll fold it into whichever jobs it fits.
+The jobs above are plain scripts with no model in the loop, which is how they should ship. The one place a
+classifier would earn its keep later is ranking the `watch-new` review queue, so curators look at the most
+suspicious candidates first. That is a scoring task over a fixed set of features we already compute
+(placeholder label, first-time label, title similarity, release gap), not a text-generation task.
+
+Jev (https://jevtypesafe.org/), a decision model aimed at exactly this kind of routing and scoring, is the
+candidate for that step. We don't have access to it today, so it is not part of the design. Nothing blocks on
+it: the queue works unranked, and ranking is a pure add-on.
+
+Whatever fills that slot, it ranks the queue and never publishes. A row still needs creator confirmation or
+two curator sign-offs to enter `## Not mine`.
