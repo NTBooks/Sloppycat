@@ -1,0 +1,25 @@
+{
+  "name": "sloppycat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Creator-verified catalogs, hijack alerts, and a scam-listing blocker for Spotify, Apple Music, Deezer, Amazon Books and Goodreads.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "icons": "node scripts/icons.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "preview": "node scripts/preview-server.mjs"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.290",
+    "@types/node": "^26.6.2",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^20.14.5",
+    "preact": "^10.29.8",
+    "sharp": "^0.34.0",
+    "typescript": "^5.6.0",
+    "vitest": "^5.0.1"
+  }
+}

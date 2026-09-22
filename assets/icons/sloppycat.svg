@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Sloppycat: low-poly cat ninja. Orange tabby, dark mask over the lower face, eyes exposed. -->
+  <!-- headband tails (behind the head) -->
+  <polygon points="106,44 127,34 124,44 110,52" fill="#e0393e"/>
+  <polygon points="108,52 127,50 122,58 110,58" fill="#c22d32"/>
+  <!-- ears -->
+  <polygon points="12,54 28,8 54,40" fill="#e8862e"/>
+  <polygon points="20,50 30,20 46,40" fill="#c96a1d"/>
+  <polygon points="116,54 100,8 74,40" fill="#f6a44c"/>
+  <polygon points="108,50 98,20 82,40" fill="#c96a1d"/>
+  <!-- forehead -->
+  <polygon points="54,40 74,40 64,64" fill="#f6a44c"/>
+  <polygon points="12,54 54,40 64,64 40,68" fill="#e8862e"/>
+  <polygon points="116,54 74,40 64,64 88,68" fill="#f6a44c"/>
+  <!-- cheeks -->
+  <polygon points="12,54 40,68 30,84 8,74" fill="#c96a1d"/>
+  <polygon points="116,54 88,68 98,84 120,74" fill="#e8862e"/>
+  <!-- headband -->
+  <polygon points="12,54 116,54 112,50 16,50" fill="#1f2937"/>
+  <!-- eyes -->
+  <polygon points="32,62 50,58 54,68 38,72" fill="#9ae66e"/>
+  <polygon points="42,61 47,60 47,70 43,69" fill="#111827"/>
+  <polygon points="96,62 78,58 74,68 90,72" fill="#9ae66e"/>
+  <polygon points="86,61 81,60 81,70 85,69" fill="#111827"/>
+  <!-- mask over the lower face -->
+  <polygon points="8,74 64,80 64,124 16,98" fill="#1f2937"/>
+  <polygon points="120,74 64,80 64,124 112,98" fill="#111827"/>
+  <polygon points="30,84 64,80 64,96 40,96" fill="#2b3648"/>
+  <polygon points="98,84 64,80 64,96 88,96" fill="#1a2230"/>
+</svg>

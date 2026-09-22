@@ -1,0 +1,113 @@
+.sloppycat-badge {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font: 700 11px/16px system-ui, sans-serif;
+  text-align: center;
+  vertical-align: middle;
+  cursor: help;
+  color: #fff;
+}
+.sloppycat-badge.sc-verified {
+  background: #2f8f4e;
+}
+.sloppycat-badge.sc-not_mine {
+  background: #c9362f;
+}
+.sloppycat-badge.sc-likely_accurate {
+  background: #3f6fb5;
+}
+.sloppycat-card .sc-head.sc-likely_accurate {
+  color: #3f6fb5;
+}
+.sloppycat-badge.sc-unconfirmed {
+  background: #8a8a8a;
+}
+.sloppycat-flagged {
+  outline: 2px dashed #c9362f;
+  outline-offset: 2px;
+}
+.sloppycat-card {
+  position: absolute;
+  z-index: 2147483646;
+  width: 300px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fff;
+  color: #1c1b19;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  border: 1px solid #e4e0d8;
+  font: 13px/1.4 system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  .sloppycat-card {
+    background: #1e1c17;
+    color: #f1ede4;
+    border-color: #2c2a24;
+  }
+}
+.sloppycat-card .sc-head {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.sloppycat-card .sc-head.sc-verified {
+  color: #2f8f4e;
+}
+.sloppycat-card .sc-head.sc-not_mine {
+  color: #c9362f;
+}
+.sloppycat-card .sc-head.sc-unconfirmed {
+  color: #8a8a8a;
+}
+.sloppycat-card .sc-glyph {
+  display: inline-block;
+  width: 18px;
+}
+.sloppycat-card .sc-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.sloppycat-card .sc-note {
+  margin: 6px 0;
+}
+.sloppycat-card .sc-muted {
+  opacity: 0.7;
+  font-size: 12px;
+}
+.sloppycat-card .sc-disc {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 8px 0;
+  font-size: 12px;
+}
+.sloppycat-card .sc-k {
+  opacity: 0.7;
+  text-transform: capitalize;
+}
+.sloppycat-card .sc-v {
+  font-weight: 600;
+}
+.sloppycat-card .sc-v.sc-human {
+  color: #2f8f4e;
+}
+.sloppycat-card .sc-v.sc-ai-assisted {
+  color: #9a6b00;
+}
+.sloppycat-card .sc-v.sc-ai-generated {
+  color: #c9362f;
+}
+.sloppycat-card .sc-src {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(128, 128, 128, 0.25);
+  font-size: 12px;
+  opacity: 0.85;
+}
+.sloppycat-card .sc-link {
+  color: #e8862e;
+}
