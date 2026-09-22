@@ -72,5 +72,7 @@ export function describeSignal(s: Signal): string {
       return `Title resembles "${s.ofTitle}" (${Math.round(s.score * 100)}% match)`;
     case "released_after":
       return `Released after "${s.watchedTitle}" (${s.watchedDate})`;
+    case "count_drift":
+      return `Spotify counts ${s.added} more ${s.category} than last time, but only ${s.seen} new one${s.seen === 1 ? "" : "s"} are visible in the newest releases`;
   }
 }

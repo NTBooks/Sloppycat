@@ -292,6 +292,47 @@ function MyList() {
   );
 }
 
+function Testing() {
+  const [profiles] = useStorage("profiles");
+  const [alerts] = useStorage("alerts");
+  const [msg, setMsg] = useState("");
+  const watched = Object.keys(profiles ?? {}).length;
+  const run = async (kind: "new" | "lookalike" | "drift") => {
+    const r = await send<{ ok: boolean; error?: string }>({ type: "dev:simulate", kind });
+    setMsg(r.ok ? "Planted. Open Alerts." : (r.error ?? "Failed"));
+  };
+  return (
+    <section class="card stack">
+      <h2>Testing</h2>
+      <p class="muted" style="margin:0">
+        Plant something on a watched profile so you can walk the whole path (alert, signals, takedown letter)
+        without waiting for a real one, or owning a catalogue for it to happen to. Nothing is sent anywhere and
+        nothing changes on the platform; these live only in this browser.
+      </p>
+      {watched === 0 ? (
+        <Empty>Watch a profile first. Any public artist or author page will do, it doesn't have to be yours.</Empty>
+      ) : (
+        <div class="row">
+          <Button onClick={() => void run("new")}>Plant a new release</Button>
+          <Button onClick={() => void run("lookalike")}>Plant a lookalike</Button>
+          <Button onClick={() => void run("drift")}>Plant a hidden-count warning</Button>
+          <Button
+            kind="danger"
+            onClick={async () => {
+              await storage.set("alerts", {});
+              setMsg("Alerts cleared.");
+            }}
+            disabled={!Object.keys(alerts ?? {}).length}
+          >
+            Clear all alerts
+          </Button>
+        </div>
+      )}
+      {msg && <div class="notice ok">{msg}</div>}
+    </section>
+  );
+}
+
 function Sources() {
   const [sources] = useStorage("listSources");
   const [cache] = useStorage("listCache");
@@ -384,6 +425,7 @@ function Options() {
       <Experimental />
       <MyList />
       <Sources />
+      <Testing />
     </div>
   );
 }

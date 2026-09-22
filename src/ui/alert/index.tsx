@@ -28,8 +28,14 @@ function AlertRow(props: { alert: Alert; highlight: boolean }) {
     <div class={`card stack`} id={a.id} style={props.highlight ? "outline:2px solid var(--accent)" : ""}>
       <div class="row" style="justify-content:space-between">
         <div class="row">
-          <Chip tone={a.change === "lookalike" ? "warn" : "bad"}>
-            {a.change === "added" ? "New on your profile" : a.change === "changed" ? "Changed" : "Lookalike elsewhere"}
+          <Chip tone={a.change === "lookalike" || a.change === "count_drift" ? "warn" : "bad"}>
+            {a.change === "added"
+              ? "New on your profile"
+              : a.change === "changed"
+                ? "Changed"
+                : a.change === "lookalike"
+                  ? "Lookalike elsewhere"
+                  : "Something is hidden from view"}
           </Chip>
           {a.resolution && <Chip tone={a.resolution === "mine" ? "ok" : a.resolution === "not_mine" ? "bad" : "muted"}>{a.resolution.replace("_", " ")}</Chip>}
         </div>
@@ -40,7 +46,14 @@ function AlertRow(props: { alert: Alert; highlight: boolean }) {
       <ItemCard item={a.item}>
         <SignalChips signals={a.signals} />
       </ItemCard>
-      {!a.resolution && (
+      {!a.resolution && a.change === "count_drift" && (
+        <div class="row">
+          <Button kind="ghost" onClick={() => void send({ type: "alert:resolve", alertId: a.id, resolution: "dismissed" })}>
+            Dismiss
+          </Button>
+        </div>
+      )}
+      {!a.resolution && a.change !== "count_drift" && (
         <div class="stack">
           <div class="row">
             <input type="text" placeholder="disclosure if mine (text:human; cover:ai-assisted)" value={disclosure} onInput={(e) => setDisclosure((e.target as HTMLInputElement).value)} style="flex:1" />
@@ -62,6 +75,29 @@ function AlertRow(props: { alert: Alert; highlight: boolean }) {
           </div>
         </div>
       )}
+      {a.change === "count_drift" ? (
+        <div class="stack">
+          <div class="notice">
+            Spotify only shows the ten newest albums and ten newest singles on an artist page, and a release can
+            carry any date its uploader typed. So something added with an old date sits in the middle of your
+            catalog where that view never reaches. The totals moved by more than what turned up at the top.
+          </div>
+          <div>
+            <h3>What to do</h3>
+            <ol>
+              <li>
+                Open{" "}
+                <a href={a.item.url} target="_blank" rel="noreferrer">
+                  your full discography
+                </a>{" "}
+                while signed in, and scroll to the bottom so the whole list loads.
+              </li>
+              <li>Come back and run a check. With the page loaded, Sloppycat can read past the newest ten.</li>
+              <li>Anything that isn't yours gets its takedown letter as usual.</li>
+            </ol>
+          </div>
+        </div>
+      ) : (
       <details open={a.resolution === "not_mine" || props.highlight}>
         <summary>Takedown packet: {packet.title}</summary>
         <div class="stack" style="margin-top:8px">
@@ -96,6 +132,7 @@ function AlertRow(props: { alert: Alert; highlight: boolean }) {
           </div>
         </div>
       </details>
+      )}
     </div>
   );
 }

@@ -105,8 +105,14 @@ that you haven't already claimed becomes an alert with its packet ready.
 It also searches for near-copies of your titles somewhere else on the platform, which is the other half of
 this scam and the half a profile check can't see.
 
-**One limit, stated plainly:** checks only run while Chrome is open. That's as far as a browser extension
-reaches. Leave it running and hourly means hourly.
+**Two limits worth knowing.** Checks only run while Chrome is open, which is as far as an extension reaches.
+And Spotify only hands over your ten newest albums and ten newest singles, so a fake uploaded with an old date
+sits where that view never reaches: the extension pages past it where it can, and watches the release counts
+to catch it where it cannot. The full list is in [what it cannot see](docs/limits.md).
+
+There is a **Testing** panel in Settings that plants an alert on a watched profile, so you can walk the whole
+path without waiting for a real one. You do not need to be published to try any of this: watch any public
+profile.
 
 ---
 
@@ -238,7 +244,7 @@ npm run preview
 `preview` serves the extension pages with a fake browser API so you can poke at the UI in a normal tab;
 `/demo` renders the overlay against a mock platform page, which is where these screenshots come from.
 
-Also here: [who gets to speak for a profile](docs/trust.md) · [user reports](docs/reporting.md) · [research, with sources](research/) · [the list format](docs/list-format.md) · [what ships in the default list](docs/baseline-plan.md) ·
+Also here: [what it cannot see](docs/limits.md) · [who gets to speak for a profile](docs/trust.md) · [user reports](docs/reporting.md) · [research, with sources](research/) · [the list format](docs/list-format.md) · [what ships in the default list](docs/baseline-plan.md) ·
 [how the community list is policed](lists/CONTRIBUTING.md) · [marketing notes](docs/marketing.md)
 
 ## This needs people whose word carries

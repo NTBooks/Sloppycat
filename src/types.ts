@@ -53,6 +53,8 @@ export interface Snapshot {
   profileKey: string; // platform:profileId
   takenAt: string;
   items: SnapshotItem[];
+  /** Per-category totals the platform reported at that time. */
+  counts?: Record<string, number>;
 }
 
 export type Signal =
@@ -60,14 +62,15 @@ export type Signal =
   | { kind: "distributor_placeholder"; label: string }
   | { kind: "indie_zero_reviews" }
   | { kind: "lookalike"; ofTitle: string; score: number }
-  | { kind: "released_after"; watchedTitle: string; watchedDate: string };
+  | { kind: "released_after"; watchedTitle: string; watchedDate: string }
+  | { kind: "count_drift"; category: string; added: number; seen: number };
 
 export interface Alert {
   id: string;
   profileKey: string;
   createdAt: string;
   item: SnapshotItem;
-  change: "added" | "changed" | "lookalike";
+  change: "added" | "changed" | "lookalike" | "count_drift";
   signals: Signal[];
   resolution?: "mine" | "not_mine" | "dismissed";
   resolvedAt?: string;
@@ -225,6 +228,7 @@ export type Message =
   | { type: "verify:profile"; profileKey: string }
   | { type: "claims:check"; listUrl: string; platform: Platform }
   | { type: "scan:collect"; tabId: number }
+  | { type: "dev:simulate"; kind: "new" | "lookalike" | "drift"; profileKey?: string }
   | { type: "snapshot:fromTab"; tabId: number }
   | { type: "open:onboard"; platform?: Platform; profileId?: string }
   | { type: "extract:run"; platform: Platform; profileId: string };
@@ -238,6 +242,14 @@ export interface ExtractResult {
   items: SnapshotItem[];
   /** True when the page looks like a bot challenge / captcha instead of content. */
   challenged?: boolean;
+  /**
+   * How many items the platform says exist per category, which can exceed how many it handed us.
+   * The gap is what catches a release inserted with an old date, since that never appears in a
+   * newest-first window.
+   */
+  counts?: Record<string, number>;
+  /** Total items we actually saw, when the platform only gave us a window of the catalog. */
+  partial?: boolean;
 }
 
 /** Verdict a consumer overlay renders for one item. */

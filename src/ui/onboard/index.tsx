@@ -258,6 +258,17 @@ function Wizard() {
               <input type="text" placeholder="text:human; cover:ai-assisted" style="flex:1" onChange={(e) => setRows(rows.map((r) => ({ ...r, disclosure: (e.target as HTMLInputElement).value })))} />
             </div>
           </div>
+          {result.partial && (
+            <div class="notice">
+              Spotify's artist page only gives up the ten newest albums and ten newest singles, and it says you have
+              more than that. Open{" "}
+              <a href={`${detected.url}/discography/all`} target="_blank" rel="noreferrer">
+                your full discography
+              </a>{" "}
+              while signed in, scroll to the bottom, then snapshot again to catch the rest. Worth doing: a fake can
+              be uploaded with an old date, which puts it in the middle of your catalog rather than at the top.
+            </div>
+          )}
           {rows.length === 0 && <Empty>Nothing was found on this page. If it's a Spotify artist page, try the "…/discography/all" view.</Empty>}
           {grouped.map((g) => (
             <details class="card group" key={g.kind} open={!OFF_BY_DEFAULT.has(g.kind)}>

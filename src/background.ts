@@ -9,7 +9,14 @@ import { ensureDefaultSources, refreshAll, lookup, unprovenClaims } from "./list
 import { verifyProfile, runClaimCheck } from "./lists/verify";
 import { getClaim, isFresh } from "./lists/claims";
 import { mergeCreatorDoc } from "./lists/format";
-import { parseSpotifyCaptures } from "./adapters/spotify-json";
+import {
+  countsOf,
+  driftBetween,
+  pageRequest,
+  parseSpotifyCaptures,
+  pickPaginator,
+  type SpotifyCapture,
+} from "./adapters/spotify-json";
 
 const ALARM_RUN = "sloppycat:run";
 const ALARM_LISTS = "sloppycat:lists";
@@ -98,12 +105,54 @@ async function waitForSpotifyCaptures(tabId: number, profileId: string, timeoutM
   return readSpotifyCaptures(tabId);
 }
 
+/**
+ * The artist page hands over the newest 10 albums and 10 singles. When it also made a paginated
+ * request we can re-issue, walk the rest of the catalog with the page's own short-lived credentials,
+ * for the artist the user is already looking at.
+ */
+async function pageThroughCatalog(caps: SpotifyCapture[], have: number): Promise<unknown[]> {
+  const paginator = pickPaginator(caps);
+  if (!paginator) return [];
+  const limit = Math.max(25, Number(paginator.variables[paginator.limitKey]) || 50);
+  const extra: unknown[] = [];
+  for (let offset = have, page = 0; page < 12; page++, offset += limit) {
+    const { url, init } = pageRequest(paginator, offset, limit);
+    let json: unknown;
+    try {
+      const res = await fetch(url, init);
+      if (!res.ok) break;
+      json = await res.json();
+    } catch {
+      break;
+    }
+    const before = extra.length;
+    extra.push(json);
+    // Stop as soon as a page adds nothing new.
+    const merged = parseSpotifyCaptures([...caps, ...extra], "", new Date().toISOString());
+    if (extra.length === before || !merged.items.length) break;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return extra;
+}
+
 export async function extractFromTab(tabId: number, platform: Platform, profileId: string): Promise<ExtractResult> {
   if (platform === "spotify" && !profileId.includes(":")) {
     // Structured data first; the DOM is virtualized and only a fallback.
-    const caps = await waitForSpotifyCaptures(tabId, profileId, 12000);
-    const parsed = parseSpotifyCaptures(caps, profileId, new Date().toISOString());
-    if (parsed.items.length) return parsed;
+    const caps = (await waitForSpotifyCaptures(tabId, profileId, 12000)) as SpotifyCapture[];
+    const now = new Date().toISOString();
+    let parsed = parseSpotifyCaptures(caps, profileId, now);
+    if (parsed.items.length) {
+      const counts = parsed.counts ?? {};
+      const total = counts["all"] ?? (counts["albums"] ?? 0) + (counts["singles"] ?? 0) + (counts["compilations"] ?? 0);
+      const own = parsed.items.filter((i) => i.kind !== "appears_on").length;
+      if (total > own) {
+        const extra = await pageThroughCatalog(caps, own);
+        if (extra.length) parsed = parseSpotifyCaptures([...caps, ...extra], profileId, now);
+      }
+      const seen = parsed.items.filter((i) => i.kind !== "appears_on").length;
+      parsed.partial = total > seen;
+      return parsed;
+    }
   }
   await chrome.scripting.executeScript({ target: { tabId }, files: ["content/extract.js"] });
   const res = (await chrome.tabs.sendMessage(tabId, { type: "extract:run", platform, profileId })) as
@@ -221,9 +270,39 @@ export async function ingestSnapshot(profile: Profile, result: ExtractResult, do
   // Preserve firstSeen from the previous snapshot.
   const prevMap = new Map((prev?.items ?? []).map((i) => [i.itemId, i]));
   const items = result.items.map((i) => ({ ...i, firstSeen: prevMap.get(i.itemId)?.firstSeen ?? i.firstSeen }));
-  await storage.update("snapshots", (all) => ({ ...all, [key]: { profileKey: key, takenAt: c.now, items } }));
+  await storage.update("snapshots", (all) => ({
+    ...all,
+    [key]: { profileKey: key, takenAt: c.now, items, counts: result.counts ?? prev?.counts },
+  }));
 
   const newAlerts: Alert[] = [];
+
+  // A release dated in the past never shows up in a newest-first window, so compare the counts the
+  // platform reports as well as the items it handed us.
+  const drift = driftBetween(prev?.counts, result.counts ?? {});
+  if (drift.length && prev) {
+    const addedVisible = prev ? result.items.filter((i) => !prevMap.has(i.itemId)).length : 0;
+    for (const d of drift) {
+      if (d.added <= addedVisible) continue;
+      newAlerts.push({
+        id: crypto.randomUUID(),
+        profileKey: key,
+        createdAt: c.now,
+        change: "count_drift",
+        signals: [{ kind: "count_drift", category: d.category, added: d.added, seen: addedVisible }],
+        item: {
+          platform: profile.platform,
+          itemId: `counts:${d.category}`,
+          title: `${d.added} more ${d.category} than last time, and not all of them are visible`,
+          kind: "unknown",
+          url: `${profile.url}/discography/all`,
+          firstSeen: c.now,
+          source: "profile",
+        },
+      });
+    }
+  }
+
   if (prev) {
     const d = diffSnapshots(prev.items, items);
     for (let added of d.added) {
@@ -519,6 +598,74 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
           },
         });
         return { ok: true, links: (res?.result as { href: string; text: string }[]) ?? [] };
+      }
+      case "dev:simulate": {
+        // Testing aid: plant something on a watched profile so the whole alert path can be exercised
+        // without waiting for a real hijack, or owning a catalogue for one to happen to.
+        const m = msg as Extract<Message, { type: "dev:simulate" }>;
+        const profiles = await storage.get("profiles");
+        const profile = m.profileKey ? profiles[m.profileKey] : Object.values(profiles)[0];
+        if (!profile) return { ok: false, error: "Watch a profile first, then simulate against it." };
+        const pk = keyOf(profile);
+        const stamp = new Date().toISOString();
+        const suffix = Math.random().toString(36).slice(2, 8);
+        const adapter = adapterFor(profile.platform);
+
+        if (m.kind === "drift") {
+          const snaps = await storage.get("snapshots");
+          const snap = snaps[pk];
+          const counts = { ...(snap?.counts ?? { singles: 10 }) };
+          const category = Object.keys(counts)[0] ?? "singles";
+          const alert: Alert = {
+            id: crypto.randomUUID(),
+            profileKey: pk,
+            createdAt: stamp,
+            change: "count_drift",
+            signals: [{ kind: "count_drift", category, added: 3, seen: 0 }],
+            item: {
+              platform: profile.platform,
+              itemId: `counts:${category}`,
+              title: `3 more ${category} than last time, and none of them are visible`,
+              kind: "unknown",
+              url: `${profile.url}/discography/all`,
+              firstSeen: stamp,
+              source: "profile",
+            },
+          };
+          await storage.update("alerts", (all) => ({ ...all, [alert.id]: alert }));
+          await notify(profile, [alert]);
+          return { ok: true };
+        }
+
+        const fake: SnapshotItem = {
+          platform: profile.platform,
+          itemId: profile.platform === "amazon" ? `B0TEST${suffix.toUpperCase().slice(0, 4)}` : `test${suffix}`,
+          title: m.kind === "lookalike" ? "Test Release: Summary & Analysis" : "Midnight Jazz Vibes (test)",
+          subtitle: profile.displayName,
+          kind: profile.platform === "amazon" || profile.platform === "goodreads" ? "book" : "single",
+          releaseDate: stamp.slice(0, 10),
+          label: profile.platform === "amazon" ? "Independently published" : "8412 Records DK",
+          url: adapter.itemUrl(profile.platform === "amazon" ? "B0TESTFAKE" : "testfake"),
+          meta: { simulated: true, reviewCount: 0 },
+          firstSeen: stamp,
+          source: m.kind === "lookalike" ? "search" : "profile",
+        };
+        const snapshots = await storage.get("snapshots");
+        const history = snapshots[pk]?.items ?? [];
+        const alert: Alert = {
+          id: crypto.randomUUID(),
+          profileKey: pk,
+          createdAt: stamp,
+          change: m.kind === "lookalike" ? "lookalike" : "added",
+          item: fake,
+          signals:
+            m.kind === "lookalike"
+              ? [{ kind: "lookalike", ofTitle: history[0]?.title ?? "Your title", score: 0.93 }, ...signalsFor(fake, history)]
+              : signalsFor(fake, history),
+        };
+        await storage.update("alerts", (all) => ({ ...all, [alert.id]: alert }));
+        await notify(profile, [alert]);
+        return { ok: true };
       }
       case "open:onboard": {
         const m = msg as Extract<Message, { type: "open:onboard" }>;
