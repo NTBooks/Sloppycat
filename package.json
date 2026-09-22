@@ -10,7 +10,8 @@
     "icons": "node scripts/icons.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "preview": "node scripts/preview-server.mjs"
+    "preview": "node scripts/preview-server.mjs",
+    "package": "node scripts/package.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.290",

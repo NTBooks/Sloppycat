@@ -244,7 +244,7 @@ npm run preview
 `preview` serves the extension pages with a fake browser API so you can poke at the UI in a normal tab;
 `/demo` renders the overlay against a mock platform page, which is where these screenshots come from.
 
-Also here: [what it cannot see](docs/limits.md) · [who gets to speak for a profile](docs/trust.md) · [user reports](docs/reporting.md) · [research, with sources](research/) · [the list format](docs/list-format.md) · [what ships in the default list](docs/baseline-plan.md) ·
+Also here: [privacy](docs/privacy.md) · [store submission notes](docs/store-listing.md) · [what it cannot see](docs/limits.md) · [who gets to speak for a profile](docs/trust.md) · [user reports](docs/reporting.md) · [research, with sources](research/) · [the list format](docs/list-format.md) · [what ships in the default list](docs/baseline-plan.md) ·
 [how the community list is policed](lists/CONTRIBUTING.md) · [marketing notes](docs/marketing.md)
 
 ## This needs people whose word carries
