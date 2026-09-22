@@ -69,9 +69,32 @@ window.chrome = {
 </script>
 `;
 
+// A stand-in platform page, dark like Spotify's, used to screenshot the overlay components.
+const DEMO = `<!doctype html><html><head><meta charset="utf-8"><title>Sloppycat overlay demo</title>
+<link rel="stylesheet" href="/content/overlay.css">
+<style>
+  body { margin:0; background:#121212; color:#fff; font:14px/1.5 system-ui,sans-serif; padding:28px 32px 220px; }
+  h2 { font-size:22px; margin:0 0 4px; letter-spacing:-0.02em; }
+  .sub { color:#a7a7a7; font-size:13px; margin-bottom:22px; }
+  .demo-row { display:flex; gap:14px; align-items:center; padding:9px 10px; border-radius:6px; }
+  .demo-row:hover { background:#1a1a1a; }
+  .demo-art { width:46px; height:46px; border-radius:3px; background:linear-gradient(135deg,#3a3a3a,#242424); flex:none; }
+  .demo-title { color:#fff; font-weight:600; text-decoration:none; }
+  .demo-meta { color:#a7a7a7; font-size:12px; }
+</style></head><body>
+<h2>The Smiths</h2><div class="sub">Discography</div>
+<div id="rows"></div>
+<script src="/content/demo-card.js"></script>
+</body></html>`;
+
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://x");
+    if (url.pathname === "/demo") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(DEMO);
+      return;
+    }
     const path = url.pathname === "/" ? "/ui/onboard/index.html" : url.pathname;
     let body = await readFile(join(root, path));
     const ext = extname(path);

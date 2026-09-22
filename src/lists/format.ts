@@ -2,8 +2,18 @@
 // See docs/list-format.md. Headers are "Key: value" lines after the H1;
 // data lives in three H2 sections (Creator, Mine, Not mine) as pipe tables.
 
-import type { Disclosure, ListCreatorRow, ListDocument, ListLikelyRow, ListMineRow, ListNotMineRow, Platform } from "../types";
-import { PLATFORMS } from "../types";
+import type {
+  Disclosure,
+  Identifiers,
+  ListAttestedRow,
+  ListCreatorRow,
+  ListDocument,
+  ListLikelyRow,
+  ListMineRow,
+  ListNotMineRow,
+  Platform,
+} from "../types";
+import { ID_KEYS, PLATFORMS } from "../types";
 
 export const FORMAT_MARKER = "<!-- sloppycat/v1 -->";
 
@@ -18,10 +28,12 @@ export interface ParseResult {
   warnings: ParseError[];
 }
 
-type Section = "creator" | "mine" | "notMine" | "likely";
+type Section = "creator" | "mine" | "notMine" | "likely" | "attested";
 const SECTION_ALIASES: Record<string, Section> = {
   "likely accurate": "likely",
   likely: "likely",
+  attested: "attested",
+  attestations: "attested",
   creator: "creator",
   creators: "creator",
   mine: "mine",
@@ -75,6 +87,23 @@ export function serializeDisclosure(d: Disclosure | undefined): string {
   return Object.entries(d)
     .map(([k, v]) => `${k}:${v}`)
     .join("; ");
+}
+
+/** ISBN-13 and ISBN-10 both normalize to digits, so "978-0-00-000000-0" matches "9780000000000". */
+export function normalizeId(key: string, raw: string): string {
+  const v = raw.trim();
+  if (key === "isbn" || key === "upc") return v.replace(/[^0-9Xx]/g, "").toUpperCase();
+  if (key === "isrc") return v.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return v;
+}
+
+function readIds(row: Record<string, string>): Identifiers | undefined {
+  const out: Identifiers = {};
+  for (const k of ID_KEYS) {
+    const v = row[k];
+    if (v) out[k] = normalizeId(k, v);
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 function isPlatform(s: string): s is Platform {
@@ -185,6 +214,17 @@ export function parseList(text: string): ParseResult {
         continue;
       }
       doc.creator.push({ platform, profile });
+    } else if (section === "attested") {
+      const listUrl = row["list"] ?? "";
+      const profile = row["profile"] ?? "";
+      if (!/^https?:\/\//.test(listUrl) || !/^https?:\/\//.test(profile)) {
+        errors.push({ line: lineNo, message: "Attested row needs a profile URL and a list URL" });
+        continue;
+      }
+      const r: ListAttestedRow = { platform, profile, list: listUrl };
+      if (row["checked"]) r.checked = row["checked"];
+      if (row["by"]) r.by = row["by"];
+      (doc.attested ??= []).push(r);
     } else if (section === "likely") {
       const id = row["id"] ?? "";
       if (!id) {
@@ -203,6 +243,8 @@ export function parseList(text: string): ParseResult {
       const r: ListMineRow = { platform, id, title: row["title"] ?? "" };
       const d = parseDisclosure(row["disclosure"]);
       if (d) r.disclosure = d;
+      const ids = readIds(row);
+      if (ids) r.ids = ids;
       doc.mine.push(r);
     } else {
       const id = row["id"] ?? "";
@@ -214,6 +256,8 @@ export function parseList(text: string): ParseResult {
       if (row["first seen"]) r.firstSeen = row["first seen"];
       if (row["note"]) r.note = row["note"];
       if (row["source"]) r.source = row["source"];
+      const nids = readIds(row);
+      if (nids) r.ids = nids;
       doc.notMine.push(r);
     }
   }
@@ -253,10 +297,18 @@ export function serializeList(doc: ListDocument): string {
   out.push(table(["platform", "profile"], doc.creator.map((r) => [r.platform, r.profile])));
   out.push("");
   out.push("## Mine");
+  // Only write identifier columns that some row actually carries.
+  const mineIdKeys = ID_KEYS.filter((k) => doc.mine.some((r) => r.ids?.[k]));
   out.push(
     table(
-      ["platform", "id", "title", "disclosure"],
-      doc.mine.map((r) => [r.platform, r.id, r.title, serializeDisclosure(r.disclosure)]),
+      ["platform", "id", "title", "disclosure", ...mineIdKeys],
+      doc.mine.map((r) => [
+        r.platform,
+        r.id,
+        r.title,
+        serializeDisclosure(r.disclosure),
+        ...mineIdKeys.map((k) => r.ids?.[k] ?? ""),
+      ]),
     ),
   );
   out.push("");
@@ -264,16 +316,27 @@ export function serializeList(doc: ListDocument): string {
   const cols = ["platform", "id", "title", "first seen", "note"];
   const hasSource = doc.notMine.some((r) => r.source);
   if (hasSource) cols.push("source");
+  const notMineIdKeys = ID_KEYS.filter((k) => doc.notMine.some((r) => r.ids?.[k]));
   out.push(
     table(
-      cols,
+      [...cols, ...notMineIdKeys],
       doc.notMine.map((r) => {
         const cells = [r.platform, r.id, r.title, r.firstSeen ?? "", r.note ?? ""];
         if (hasSource) cells.push(r.source ?? "");
-        return cells;
+        return [...cells, ...notMineIdKeys.map((k) => r.ids?.[k] ?? "")];
       }),
     ),
   );
+  if (doc.attested?.length) {
+    out.push("");
+    out.push("## Attested");
+    out.push(
+      table(
+        ["platform", "profile", "list", "checked", "by"],
+        doc.attested.map((r) => [r.platform, r.profile, r.list, r.checked ?? "", r.by ?? ""]),
+      ),
+    );
+  }
   if (doc.likely?.length) {
     out.push("");
     out.push("## Likely accurate");

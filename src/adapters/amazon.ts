@@ -58,6 +58,11 @@ export const amazon: Adapter = {
     }
     return res;
   },
+  async fetchBio(profileId, ctx) {
+    const [host, authorId] = split(profileId);
+    const res = await ctx.render(`https://${host}/stores/author/${authorId}/about`, "amazon", profileId);
+    return res.bio;
+  },
   async searchLookalikes(query, ctx) {
     const url = `https://www.amazon.com/s?k=${encodeURIComponent(query)}&i=stripbooks`;
     let parsed;

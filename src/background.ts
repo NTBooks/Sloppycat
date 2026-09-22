@@ -5,8 +5,9 @@ import * as storage from "./storage";
 import { adapterFor, detectProfile, type FetchContext } from "./adapters";
 import { diffSnapshots } from "./diff";
 import { signalsFor, lookalikeSignal } from "./signals";
-import { ensureDefaultSources, refreshAll, lookup } from "./lists/sources";
-import { verifyProfile } from "./lists/verify";
+import { ensureDefaultSources, refreshAll, lookup, unprovenClaims } from "./lists/sources";
+import { verifyProfile, runClaimCheck } from "./lists/verify";
+import { getClaim, isFresh } from "./lists/claims";
 import { mergeCreatorDoc } from "./lists/format";
 import { parseSpotifyCaptures } from "./adapters/spotify-json";
 
@@ -324,6 +325,34 @@ chrome.notifications.onClicked.addListener((id) => {
   void chrome.tabs.create({ url: chrome.runtime.getURL(`ui/alert/index.html${alertId ? `#${alertId}` : ""}`) });
 });
 
+// ---------- claim checking ----------
+
+let proving = new Set<string>();
+
+/** Verify any unproven claim over the profile the viewer is looking at, one at a time. */
+async function proveClaimsFor(platform: Platform, profileUrl: string): Promise<void> {
+  let pending: string[];
+  try {
+    pending = await unprovenClaims(platform, profileUrl);
+  } catch {
+    return;
+  }
+  for (const listUrl of pending) {
+    const key = `${listUrl}|${platform}`;
+    if (proving.has(key)) continue;
+    const existing = await getClaim(listUrl, platform);
+    if (isFresh(existing)) continue; // already checked recently, good or bad
+    proving.add(key);
+    try {
+      await runClaimCheck(listUrl, platform, ctx());
+    } catch {
+      /* a failed check just leaves the list untrusted */
+    } finally {
+      proving.delete(key);
+    }
+  }
+}
+
 // ---------- creator decisions ----------
 
 async function resolveAlert(
@@ -406,8 +435,19 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         await refreshAll(true);
         return { ok: true };
       case "lists:lookup": {
-        const m = msg as Extract<Message, { type: "lists:lookup" }> & { profileUrl?: string };
-        return { ok: true, verdicts: await lookup(m.platform, m.ids, m.profileUrl) };
+        const m = msg as Extract<Message, { type: "lists:lookup" }> & {
+          profileUrl?: string;
+          pageIds?: Record<string, import("./types").Identifiers>;
+        };
+        // If a subscribed list claims this profile but hasn't proved it, prove it now. Nothing from
+        // that list renders until it passes, so a forged claim shows the viewer nothing.
+        if (m.profileUrl) void proveClaimsFor(m.platform, m.profileUrl);
+        return { ok: true, verdicts: await lookup(m.platform, m.ids, m.profileUrl, m.pageIds) };
+      }
+      case "claims:check": {
+        const m = msg as Extract<Message, { type: "claims:check" }>;
+        const claim = await runClaimCheck(m.listUrl, m.platform, ctx());
+        return { ok: claim.state === "verified", claim };
       }
       case "verify:profile": {
         const m = msg as Extract<Message, { type: "verify:profile" }>;

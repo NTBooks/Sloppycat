@@ -24,6 +24,8 @@ const scriptEntries = {
   "content/extract": "src/content/extract/index.ts",
   "content/overlay": "src/content/overlay/index.ts",
   "content/spotify-capture": "src/content/spotify-capture.ts",
+  // Dev-only demo used by docs/promo screenshots; not in the manifest.
+  "content/demo-card": "src/content/demo-card.ts",
 };
 
 const common = {

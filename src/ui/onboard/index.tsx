@@ -265,6 +265,14 @@ function Wizard() {
                 {KIND_LABEL[g.kind]} ({g.idx.length}){OFF_BY_DEFAULT.has(g.kind) ? <span class="muted"> · off by default: usually other people's releases you appear on</span> : null}
               </summary>
               <table class="review">
+                <colgroup>
+                  <col class="c-mine" />
+                  <col class="c-art" />
+                  <col />
+                  <col class="c-date" />
+                  <col class="c-label" />
+                  <col class="c-note" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Mine</th>
@@ -292,8 +300,8 @@ function Wizard() {
                           {r.item.subtitle && <div class="muted" style="font-size:12px">{r.item.subtitle}</div>}
                           <SignalChips signals={sig} />
                         </td>
-                        <td class="muted">{r.item.releaseDate ?? ""}</td>
-                        <td class="muted">{r.item.label ?? ""}</td>
+                        <td class="date">{r.item.releaseDate ?? ""}</td>
+                        <td class="label" title={r.item.label ?? ""}>{r.item.label ?? ""}</td>
                         <td>
                           {r.mine ? (
                             <input type="text" value={r.disclosure} placeholder="text:human" onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, disclosure: (e.target as HTMLInputElement).value } : x)))} />

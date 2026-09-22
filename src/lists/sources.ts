@@ -1,9 +1,11 @@
 // List subscriptions: fetch, cache, expire, and answer lookups for the consumer overlay.
-import type { ListSource, Platform, Verdict } from "../types";
+import type { Identifiers, ListSource, Platform, Verdict } from "../types";
+import { ID_KEYS } from "../types";
 import * as storage from "../storage";
 import type { CachedList } from "../storage";
 import { expiresToMs, parseList } from "./format";
 import { normalizeListUrl } from "../adapters/shared";
+import { attestations, claimsThisProfile, trustFor, type Trust } from "./claims";
 
 export const DEFAULT_COMMUNITY_LIST = "https://raw.githubusercontent.com/sloppycat/lists/main/community.md";
 
@@ -102,25 +104,75 @@ export async function refreshAll(force = false): Promise<void> {
  * "unconfirmed" is only returned for items whose creator is enrolled (has a creator list covering that platform),
  * which the caller establishes by passing the profile id when known.
  */
-export async function lookup(platform: Platform, ids: string[], profileUrl?: string): Promise<Record<string, Verdict>> {
+/**
+ * @param pageIds identifiers the page exposed, keyed by the platform id they belong to
+ *                (e.g. { B0C1234567: { isbn: "9780000000000" } }). Lets a claim match a re-upload
+ *                that carries the same ISBN or UPC under a different platform id.
+ */
+export async function lookup(
+  platform: Platform,
+  ids: string[],
+  profileUrl?: string,
+  pageIds?: Record<string, Identifiers>,
+): Promise<Record<string, Verdict>> {
   const cache = await storage.get("listCache");
   const sources = await storage.get("listSources");
   const enabled = new Set(sources.filter((s) => s.enabled).map((s) => s.url));
   const myList = await storage.get("myList");
   const settings = await storage.get("settings");
 
-  const lists: CachedList[] = Object.values(cache).filter((c) => enabled.has(c.source));
-  if (myList) lists.unshift({ source: settings.myListUrl ?? "local", doc: myList, fetchedAt: new Date().toISOString() });
+  const claims = await storage.get("claims");
+  const all: CachedList[] = Object.values(cache).filter((c) => enabled.has(c.source));
+  const ownSource = settings.myListUrl ?? "local";
+  if (myList) all.unshift({ source: ownSource, doc: myList, fetchedAt: new Date().toISOString() });
+
+  // A list only speaks for a platform once its claim over a profile there has been proved.
+  const attested = attestations(all);
+  const trust = new Map<string, Trust>();
+  const lists = all.filter((l) => {
+    const t = trustFor(l, platform, claims, attested, l.source === ownSource && !!myList);
+    trust.set(l.source, t);
+    return t.trusted;
+  });
 
   const out: Record<string, Verdict> = {};
   const idSet = new Set(ids);
+
+  // Build a reverse index of the identifiers this page exposed, so a row that carries the same ISRC,
+  // UPC or ISBN matches even when the platform id is different.
+  const byIdentifier = new Map<string, string>();
+  for (const [platformId, identifiers] of Object.entries(pageIds ?? {})) {
+    for (const k of ID_KEYS) {
+      const v = identifiers[k];
+      if (v) byIdentifier.set(`${k}:${v}`, platformId);
+    }
+  }
+  const matchRow = (r: { id: string; ids?: Identifiers }): string | undefined => {
+    if (idSet.has(r.id)) return r.id;
+    if (!byIdentifier.size || !r.ids) return undefined;
+    for (const k of ID_KEYS) {
+      const v = r.ids[k];
+      if (v) {
+        const hit = byIdentifier.get(`${k}:${v}`);
+        if (hit) return hit;
+      }
+    }
+    return undefined;
+  };
+  const via = (l: CachedList) => trust.get(l.source);
+  const viaOf = (l: CachedList): Verdict["via"] => {
+    const t = trust.get(l.source);
+    return t && t.via !== "none" ? t.via : undefined;
+  };
 
   const rank = (v: Verdict, isCreator: boolean) => (v.status === "not_mine" ? 2 : 1) + (isCreator ? 0.5 : 0);
 
   for (const l of lists) {
     const isCreator = l.doc.type === "creator";
     for (const r of l.doc.notMine) {
-      if (r.platform !== platform || !idSet.has(r.id)) continue;
+      if (r.platform !== platform) continue;
+      const hitId = matchRow(r);
+      if (!hitId) continue;
       const v: Verdict = {
         status: "not_mine",
         listTitle: l.doc.title,
@@ -128,19 +180,25 @@ export async function lookup(platform: Platform, ids: string[], profileUrl?: str
         creatorProfile: l.doc.creator.find((c) => c.platform === platform)?.profile,
         firstSeen: r.firstSeen,
         note: r.note,
+        via: viaOf(l),
+        attestedBy: via(l)?.attestedBy,
       };
-      if (!out[r.id] || rank(v, isCreator) > rank(out[r.id]!, false)) out[r.id] = v;
+      if (!out[hitId] || rank(v, isCreator) > rank(out[hitId]!, false)) out[hitId] = v;
     }
     for (const r of l.doc.mine) {
-      if (r.platform !== platform || !idSet.has(r.id)) continue;
+      if (r.platform !== platform) continue;
+      const hitId = matchRow(r);
+      if (!hitId) continue;
       const v: Verdict = {
         status: "verified",
         listTitle: l.doc.title,
         listUrl: l.source,
         creatorProfile: l.doc.creator.find((c) => c.platform === platform)?.profile,
         disclosure: r.disclosure,
+        via: viaOf(l),
+        attestedBy: via(l)?.attestedBy,
       };
-      if (!out[r.id]) out[r.id] = v;
+      if (!out[hitId]) out[hitId] = v;
     }
   }
 
@@ -161,9 +219,7 @@ export async function lookup(platform: Platform, ids: string[], profileUrl?: str
 
   // Unconfirmed: the page belongs to an enrolled creator, but this item is in neither section.
   if (profileUrl) {
-    const owner = lists.find(
-      (l) => l.doc.type === "creator" && l.doc.creator.some((c) => c.platform === platform && sameProfile(c.profile, profileUrl)),
-    );
+    const owner = lists.find((l) => l.doc.type === "creator" && claimsThisProfile(l.doc, platform, profileUrl));
     if (owner) {
       for (const id of ids) {
         if (!out[id]) {
@@ -173,6 +229,27 @@ export async function lookup(platform: Platform, ids: string[], profileUrl?: str
     }
   }
   return out;
+}
+
+/**
+ * Creator lists that claim this profile but have not proved it yet. The caller checks them against the
+ * platform; until one passes, nothing from those lists is shown.
+ */
+export async function unprovenClaims(platform: Platform, profileUrl: string): Promise<string[]> {
+  const cache = await storage.get("listCache");
+  const sources = await storage.get("listSources");
+  const enabled = new Set(sources.filter((s) => s.enabled).map((s) => s.url));
+  const claims = await storage.get("claims");
+  const all = Object.values(cache).filter((c) => enabled.has(c.source));
+  const attested = attestations(all);
+  return all
+    .filter(
+      (l) =>
+        l.doc.type === "creator" &&
+        claimsThisProfile(l.doc, platform, profileUrl) &&
+        !trustFor(l, platform, claims, attested, false).trusted,
+    )
+    .map((l) => l.source);
 }
 
 export function sameProfile(a: string, b: string): boolean {

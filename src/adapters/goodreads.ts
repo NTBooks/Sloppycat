@@ -43,6 +43,12 @@ export const goodreads: Adapter = {
     }
     return { platform: "goodreads", profileId, displayName, bio, items };
   },
+  async fetchBio(profileId, ctx) {
+    const url = `https://www.goodreads.com/author/show/${profileId}`;
+    const res = await fetchText(url);
+    const parsed = await ctx.parseHtml(res.text, url, "goodreads", profileId);
+    return parsed.bio;
+  },
   async searchLookalikes(query, ctx) {
     const url = `https://www.goodreads.com/search?q=${encodeURIComponent(query)}&search_type=books`;
     const res = await fetchText(url);

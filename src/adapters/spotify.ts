@@ -23,6 +23,10 @@ export const spotify: Adapter = {
     // One page load gives items and bio together.
     return ctx.render(`https://open.spotify.com/artist/${profileId}`, "spotify", profileId);
   },
+  async fetchBio(profileId, ctx) {
+    const res = await ctx.render(`https://open.spotify.com/artist/${profileId}`, "spotify", profileId);
+    return res.bio;
+  },
   async searchLookalikes(query, ctx) {
     const res = await ctx.render(`https://open.spotify.com/search/${encodeURIComponent(query)}/albums`, "spotify", `search:${query}`);
     return res.items.map((i) => ({ ...i, source: "search" as const }));

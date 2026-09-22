@@ -30,6 +30,8 @@ export interface SnapshotItem {
   imageUrl?: string;
   /** Extra platform facts useful for signals (review count, format, etc.). */
   meta?: Record<string, string | number | boolean>;
+  /** Cross-platform identifiers when the page exposes them. */
+  ids?: Identifiers;
   firstSeen: string; // ISO datetime
   source: "profile" | "search";
 }
@@ -79,11 +81,23 @@ export interface ListCreatorRow {
   profile: string; // URL
 }
 
+/**
+ * Identifiers that mean something off the platform.
+ * A platform id is a shelf number: Amazon mints a fresh ASIN per format and hands one to any upload, and
+ * Spotify album ids are local to Spotify. These travel, so a claim survives a re-upload and can be matched
+ * across sites: isrc (recording), upc (release barcode), isbn (book, registered to a publisher),
+ * mbid (MusicBrainz), discogs (Discogs release), olid (Open Library).
+ */
+export type Identifiers = Partial<Record<"isrc" | "upc" | "isbn" | "mbid" | "discogs" | "olid", string>>;
+
+export const ID_KEYS = ["isrc", "upc", "isbn", "mbid", "discogs", "olid"] as const;
+
 export interface ListMineRow {
   platform: Platform;
   id: string;
   title: string;
   disclosure?: Disclosure;
+  ids?: Identifiers;
 }
 
 export interface ListNotMineRow {
@@ -94,6 +108,7 @@ export interface ListNotMineRow {
   note?: string;
   /** Community lists cite the creator list this came from. */
   source?: string;
+  ids?: Identifiers;
 }
 
 /** Pre-cutoff catalog entry: published before the slop era, presumed genuine but not creator-verified. */
@@ -102,6 +117,16 @@ export interface ListLikelyRow {
   id: string;
   title: string;
   released?: string;
+}
+
+/** A community list vouching that a creator list really speaks for a profile. */
+export interface ListAttestedRow {
+  platform: Platform;
+  profile: string;
+  /** The creator list URL this profile pointed at when a curator checked. */
+  list: string;
+  checked?: string;
+  by?: string;
 }
 
 export interface ListDocument {
@@ -117,6 +142,7 @@ export interface ListDocument {
   mine: ListMineRow[];
   notMine: ListNotMineRow[];
   likely?: ListLikelyRow[];
+  attested?: ListAttestedRow[];
 }
 
 export interface ListSource {
@@ -131,6 +157,8 @@ export interface ListSource {
   error?: string;
   /** Built-in default list, cannot be removed (but can be disabled). */
   builtin?: boolean;
+  /** Per-platform claim state, for the settings table. */
+  claims?: { platform: Platform; state: "verified" | "failed" | "unchecked"; via?: string; reason?: string }[];
 }
 
 export interface Settings {
@@ -177,6 +205,7 @@ export type Message =
   | { type: "lists:refresh" }
   | { type: "lists:lookup"; platform: Platform; ids: string[] }
   | { type: "verify:profile"; profileKey: string }
+  | { type: "claims:check"; listUrl: string; platform: Platform }
   | { type: "snapshot:fromTab"; tabId: number }
   | { type: "open:onboard"; platform?: Platform; profileId?: string }
   | { type: "extract:run"; platform: Platform; profileId: string };
@@ -203,4 +232,7 @@ export interface Verdict {
   note?: string;
   released?: string;
   baselineBefore?: string;
+  /** How this list earned the right to speak for the profile. */
+  via?: "own-list" | "self-checked" | "attested" | "community";
+  attestedBy?: string;
 }

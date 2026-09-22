@@ -1,16 +1,11 @@
 // Consumer overlay: badges on catalog items + hover report card, driven by subscribed lists.
 // Vanilla DOM on purpose: runs on every platform page, must be light and must not shift layout.
-import type { Platform, Verdict } from "../../types";
+import type { Identifiers, Platform, Verdict } from "../../types";
 import { adapters, detectPlatform, detectProfile } from "../../adapters";
+import { cardHtml, makeBadge, STATUS_TEXT } from "./card";
 
 const platform: Platform | null = detectPlatform(location.href);
 
-const STATUS_TEXT: Record<Verdict["status"], string> = {
-  verified: "Verified by the artist",
-  not_mine: "Artist says this is NOT theirs",
-  unconfirmed: "Not yet confirmed by the artist",
-  likely_accurate: "Likely genuine: released before AI knockoffs took off",
-};
 const STATUS_GLYPH: Record<Verdict["status"], string> = { verified: "✓", not_mine: "✗", unconfirmed: "○", likely_accurate: "◷" };
 
 let card: HTMLElement | null = null;
@@ -39,30 +34,11 @@ function hideCard() {
   cardFor = null;
 }
 
-function esc(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-}
 
 function showCard(anchor: HTMLElement, title: string, v: Verdict) {
   const c = ensureCard();
   cardFor = anchor;
-  const disc = v.disclosure
-    ? `<div class="sc-disc">${Object.entries(v.disclosure)
-        .map(([k, val]) => `<span class="sc-k">${esc(k)}</span><span class="sc-v sc-${esc(String(val)).replace(/[^a-z-]/g, "")}">${esc(String(val))}</span>`)
-        .join("")}</div>`
-    : v.status === "verified"
-      ? `<div class="sc-muted">No AI disclosure attached.</div>`
-      : "";
-  c.innerHTML = `
-    <div class="sc-head sc-${v.status}"><span class="sc-glyph">${STATUS_GLYPH[v.status]}</span> ${STATUS_TEXT[v.status]}</div>
-    <div class="sc-title">${esc(title)}</div>
-    ${v.status === "not_mine" && v.note ? `<div class="sc-note">${esc(v.note)}</div>` : ""}
-    ${v.status === "not_mine" && v.firstSeen ? `<div class="sc-muted">Reported ${esc(v.firstSeen)}</div>` : ""}
-    ${v.status === "not_mine" && v.creatorProfile ? `<div><a class="sc-link" href="${esc(v.creatorProfile)}">Go to the real profile →</a></div>` : ""}
-    ${v.status === "likely_accurate" ? `<div class="sc-muted">Released ${esc(v.released ?? "before " + (v.baselineBefore ?? "the cutoff"))}. Not yet confirmed by the artist.</div>` : ""}
-    ${disc}
-    <div class="sc-src">From list: <a class="sc-link" href="${esc(v.listUrl)}" target="_blank" rel="noreferrer">${esc(v.listTitle)}</a></div>
-  `;
+  c.innerHTML = cardHtml(title, v);
   c.hidden = false;
   const r = anchor.getBoundingClientRect();
   const cw = 300;
@@ -73,27 +49,28 @@ function showCard(anchor: HTMLElement, title: string, v: Verdict) {
 }
 
 function badgeFor(v: Verdict, title: string): HTMLElement {
-  const b = document.createElement("span");
-  b.className = `sloppycat-badge sc-${v.status}`;
-  b.textContent = STATUS_GLYPH[v.status];
-  b.setAttribute("tabindex", "0");
-  b.setAttribute("role", "button");
-  b.setAttribute("aria-label", `Sloppycat: ${STATUS_TEXT[v.status]}`);
-  b.title = STATUS_TEXT[v.status];
-  const open = () => showCard(b, title, v);
-  b.addEventListener("mouseenter", open);
-  b.addEventListener("focus", open);
-  b.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    cardFor === b && card && !card.hidden ? hideCard() : open();
-  });
-  b.addEventListener("mouseleave", () => {
-    setTimeout(() => {
-      if (card && !card.matches(":hover") && cardFor === b) hideCard();
-    }, 250);
-  });
-  return b;
+  return makeBadge(
+    v,
+    (b) => showCard(b, title, v),
+    () => setTimeout(() => {
+      if (card && !card.matches(":hover")) hideCard();
+    }, 250),
+  );
+}
+
+/**
+ * Identifiers printed on the page itself. ASIN is a shelf number Amazon hands to any upload, so an
+ * ISBN, when the listing has one, is the identifier worth matching on.
+ */
+function pageIdentifiers(): Record<string, Identifiers> {
+  if (platform !== "amazon" && platform !== "goodreads") return {};
+  const itemId = platform ? adapters[platform].parseItemUrl(location.href) : null;
+  if (!itemId) return {};
+  const text = document.body.innerText.slice(0, 20000);
+  const isbn13 = /ISBN[s-]?13[s:]*([0-9][0-9 -]{11,16}[0-9X])/i.exec(text)?.[1];
+  const isbn10 = /ISBN[s-]?10[s:]*([0-9][0-9 -]{7,12}[0-9X])/i.exec(text)?.[1];
+  const isbn = (isbn13 ?? isbn10)?.replace(/[^0-9X]/gi, "").toUpperCase();
+  return isbn ? { [itemId]: { isbn } } : {};
 }
 
 function titleOf(a: HTMLAnchorElement): string {
@@ -118,7 +95,13 @@ async function scan() {
   if (need.length) {
     const profile = detectProfile(location.href);
     try {
-      const res = (await chrome.runtime.sendMessage({ type: "lists:lookup", platform, ids: need, profileUrl: profile?.url })) as {
+      const res = (await chrome.runtime.sendMessage({
+        type: "lists:lookup",
+        platform,
+        ids: need,
+        profileUrl: profile?.url,
+        pageIds: pageIdentifiers(),
+      })) as {
         ok: boolean;
         verdicts?: Record<string, Verdict>;
       };

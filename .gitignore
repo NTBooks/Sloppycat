@@ -1,4 +1,30 @@
+# dependencies
 node_modules/
+
+# build output
 dist/
 *.zip
+
+# screenshot scratch from the Playwright plugin
+.playwright-mcp/
+
+# local secrets and env
+.env
+.env.*
+!.env.example
+.dev.vars
+*.pem
+*.key
+
+# editor / OS
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# logs and caches
+*.log
+npm-debug.log*
+.cache/
+coverage/

@@ -91,6 +91,12 @@ Unknown keys and values are preserved and displayed verbatim, so the vocabulary 
    `## Creator` table names that same profile. Both directions must match, which is what makes the claim
    meaningful. `sloppycat:<gist-id>` is accepted as a short form.
 
+## One list, many profiles
+
+The `## Creator` table takes as many rows as you like, so a label, manager or lawyer can publish a single list
+covering a whole roster, and each artist's bio points at that same URL. A claim is checked per profile: the
+list speaks for the profiles that link back to it, and for no others.
+
 ## Precedence
 
 For one item id: an explicit `Not mine` beats `Mine`; a creator list beats a community list; `Likely accurate`

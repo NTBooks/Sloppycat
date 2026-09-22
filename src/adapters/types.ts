@@ -22,6 +22,8 @@ export interface Adapter {
   itemUrl(itemId: string): string;
   /** withBio: also read the creator-editable bio (costs an extra page load on some platforms). */
   fetchSnapshot(profileId: string, ctx: FetchContext, opts?: { withBio?: boolean }): Promise<ExtractResult>;
+  /** Read just the creator-editable bio, for claim checks. Cheaper than a full snapshot. */
+  fetchBio?(profileId: string, ctx: FetchContext): Promise<string | undefined>;
   /** Search the platform for titles that might be clones. */
   searchLookalikes?(query: string, ctx: FetchContext): Promise<SnapshotItem[]>;
   /** Fill in expensive fields (label, etc.) for a single item. Called only for newly seen items. */

@@ -66,7 +66,7 @@ function Profiles() {
                     </div>
                   )}
                 </td>
-                <td class="muted">{fmtDate(p.lastRunAt)}</td>
+                <td class="when">{fmtDate(p.lastRunAt)}</td>
                 <td class="row" style="justify-content:flex-end">
                   <Button onClick={() => void send({ type: "run:now", profileKey: key })}>Check</Button>
                   {adapterFor(p.platform).supportsBio && (
@@ -297,7 +297,7 @@ function Sources() {
               </td>
               <td>{s.type ?? "–"}</td>
               <td>{s.entryCount ?? "–"}</td>
-              <td class="muted">{fmtDate(s.fetchedAt)}</td>
+              <td class="when">{fmtDate(s.fetchedAt)}</td>
               <td style="text-align:right">
                 {!s.builtin && (
                   <Button kind="danger" onClick={() => void removeSource(s.url)}>

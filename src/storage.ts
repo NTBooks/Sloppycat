@@ -1,5 +1,6 @@
 // Thin typed wrapper over chrome.storage.local.
-import type { Alert, ListDocument, ListSource, Profile, Settings, Snapshot } from "./types";
+import type { Alert, ListDocument, ListSource, Platform, Profile, Settings, Snapshot } from "./types";
+import type { Claim } from "./lists/claims";
 import { DEFAULT_SETTINGS } from "./types";
 
 export interface CachedList {
@@ -16,6 +17,7 @@ export interface Schema {
   alerts: Record<string, Alert>; // by alert id
   listSources: ListSource[];
   listCache: Record<string, CachedList>; // by source url
+  claims: Record<string, Claim>; // by "<list url>|<platform>"
   /** The creator's own list, kept locally so decisions survive before publishing. */
   myList: ListDocument | null;
   runCounter: number;
@@ -28,6 +30,7 @@ const DEFAULTS: Schema = {
   alerts: {},
   listSources: [],
   listCache: {},
+  claims: {},
   myList: null,
   runCounter: 0,
 };

@@ -5,10 +5,23 @@
     <title>Sloppycat: snapshot your profile</title>
     <link rel="stylesheet" href="../base.css" />
     <style>
-      .review tr.off td { opacity: 0.55; }
-      .review .t { width: 44px; height: 44px; }
-      .group summary { font-weight: 600; color: var(--fg); padding: 8px 0; }
-      .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; align-items: center; }
+      /* Fixed columns so every group's table lines up like a track list. */
+      .review { table-layout: fixed; }
+      .review col.c-mine { width: 52px; }
+      .review col.c-art { width: 56px; }
+      .review col.c-date { width: 104px; }
+      .review col.c-label { width: 168px; }
+      .review col.c-note { width: 264px; }
+      .review td.date { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+      .review td.label { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+      .review .t { width: 40px; height: 40px; }
+      .review tr.off td { opacity: 0.5; }
+      .review a { color: var(--fg); font-weight: 600; }
+      .review a:hover { color: var(--accent); }
+      .group > summary { font-weight: 650; color: var(--fg); padding: 2px 0 10px; font-size: 13px; }
+      .group[open] > summary { border-bottom: 1px solid var(--line-soft); margin-bottom: 6px; }
+      .kv { display: grid; grid-template-columns: 150px 1fr; gap: 8px 12px; align-items: center; }
+      .kv label { margin: 0; }
     </style>
   </head>
   <body>
