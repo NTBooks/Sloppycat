@@ -38,7 +38,9 @@ function TheirList(props: { profileKey: string; profile: Profile; subscribed: bo
   useEffect(() => {
     let alive = true;
     if (!url) return;
-    void hasListAccess(url).then((ok) => alive && setNeedsGrant(!ok));
+    void hasListAccess(url)
+      .then((ok) => alive && setNeedsGrant(!ok))
+      .catch(() => alive && setNeedsGrant(false));
     return () => {
       alive = false;
     };

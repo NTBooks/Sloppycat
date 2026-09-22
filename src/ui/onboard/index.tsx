@@ -126,7 +126,10 @@ function Wizard() {
   const fan = role === "fan";
 
   useEffect(() => {
-    void chrome.tabs.query({}).then((all) => setTabs(all.filter((t) => t.url && detectProfile(t.url))));
+    void chrome.tabs
+      .query({})
+      .then((all) => setTabs(all.filter((t) => t.url && detectProfile(t.url))))
+      .catch(() => setTabs([]));
   }, []);
   // The popup hands over both the tab and which case it is, so the snapshot starts once we know.
   const [started, setStarted] = useState(false);

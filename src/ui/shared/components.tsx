@@ -19,7 +19,16 @@ export function Button(props: {
       class={`btn ${props.kind ?? ""}`}
       disabled={props.disabled}
       title={props.title}
-      onClick={() => void props.onClick?.()}
+      // A handler that rejects would otherwise surface as an uncaught error on the extension page,
+      // with a minified stack and no clue which button caused it. Most of these are async now.
+      onClick={() => {
+        try {
+          const r = props.onClick?.();
+          if (r && typeof r.catch === "function") r.catch((e: unknown) => console.error("Sloppycat: button action failed", e));
+        } catch (e) {
+          console.error("Sloppycat: button action failed", e);
+        }
+      }}
     >
       {props.children}
     </button>

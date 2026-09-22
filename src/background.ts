@@ -76,7 +76,11 @@ async function openPage(path: string): Promise<void> {
   } catch {
     /* falling through opens a new tab, which is the old behaviour */
   }
-  await chrome.tabs.create({ url: hash ? `${url}#${hash}` : url });
+  try {
+    await chrome.tabs.create({ url: hash ? `${url}#${hash}` : url });
+  } catch (e) {
+    console.error("Sloppycat: could not open", path, e);
+  }
 }
 
 // ---------- run commentary ----------

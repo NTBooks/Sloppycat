@@ -51,8 +51,13 @@ export async function openPage(path: string): Promise<void> {
       return;
     }
   } catch {
-    // tabs.query needs the tabs permission and a valid pattern; falling through opens a new one,
-    // which is the old behaviour and never worse.
+    // tabs.query needs the tabs permission and a valid pattern, and a URL carrying a query string
+    // is not a valid match pattern. Falling through opens a new tab, which is the old behaviour.
   }
-  await chrome.tabs.create({ url: hash ? `${url}#${hash}` : url });
+  try {
+    await chrome.tabs.create({ url: hash ? `${url}#${hash}` : url });
+  } catch (e) {
+    // Opening a page is never worth taking the caller down with it.
+    console.error("Sloppycat: could not open", path, e);
+  }
 }

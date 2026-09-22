@@ -41,7 +41,10 @@ function Scan() {
   const [scanned, setScanned] = useState<{ url: string; platform: Platform; items: Found[] } | null>(null);
 
   const refreshTabs = () =>
-    void chrome.tabs.query({}).then((all) => setTabs(all.filter((t) => t.url && LIBRARY_PAGES.some((p) => p.match.test(t.url!)))));
+    void chrome.tabs
+      .query({})
+      .then((all) => setTabs(all.filter((t) => t.url && LIBRARY_PAGES.some((p) => p.match.test(t.url!)))))
+      .catch(() => setTabs([]));
   useEffect(refreshTabs, []);
 
   const on = settings?.experiments.slopscan ?? false;

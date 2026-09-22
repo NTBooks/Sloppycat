@@ -16,10 +16,13 @@ function Popup() {
   const [detected, setDetected] = useState<{ platform: Platform; profileId: string; url: string } | null>(null);
 
   useEffect(() => {
-    void chrome.tabs.query({ active: true, currentWindow: true }).then(([t]) => {
-      setTab(t ?? null);
-      setDetected(t?.url ? detectProfile(t.url) : null);
-    });
+    void chrome.tabs
+      .query({ active: true, currentWindow: true })
+      .then(([t]) => {
+        setTab(t ?? null);
+        setDetected(t?.url ? detectProfile(t.url) : null);
+      })
+      .catch(() => setDetected(null));
   }, []);
 
   const open = Object.values(alerts ?? {}).filter((a) => !a.resolution).length;

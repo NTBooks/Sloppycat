@@ -8,7 +8,12 @@ export function useStorage<K extends keyof Schema>(key: K): [Schema[K] | undefin
   const [value, setValue] = useState<Schema[K] | undefined>(undefined);
   useEffect(() => {
     let alive = true;
-    const load = () => void storage.get(key).then((v) => alive && setValue(v));
+    // A read that throws would land as an uncaught error on the page with no useful stack.
+    const load = () =>
+      void storage
+        .get(key)
+        .then((v) => alive && setValue(v))
+        .catch((e: unknown) => console.error("Sloppycat: could not read", key, e));
     load();
     const off = storage.onChange([key], load);
     return () => {
