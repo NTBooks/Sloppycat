@@ -17,6 +17,28 @@ import { ID_KEYS, PLATFORMS } from "../types";
 
 export const FORMAT_MARKER = "<!-- sloppycat/v1 -->";
 
+export const SITE_URL = "https://ntbooks.github.io/Sloppycat/site/";
+export const SPEC_URL = "https://github.com/NTBooks/Sloppycat/blob/main/docs/list-format.md";
+
+/**
+ * Written into every list the extension generates. A creator's bio links here, so the first
+ * person to follow that link is reading this file with no idea what it is; the note tells them,
+ * and says how to subscribe. Comments are skipped by the parser, so it costs the format nothing.
+ */
+export const READER_NOTE = `<!--
+  This is a Sloppycat list. It says which releases on the profiles below are this creator's own
+  work, and which were published under their name by somebody else.
+
+  It reads fine as it is. To have it label what you see while you browse, install the extension:
+  ${SITE_URL}
+  Then open its options, find "List sources", paste the URL of this file, and press Add. After
+  that, anything under "Not mine" is marked, or hidden if you ask for that, on Spotify, Apple
+  Music, Deezer, Amazon, Goodreads and Google Books.
+
+  The format is documented here:
+  ${SPEC_URL}
+-->`;
+
 export interface ParseError {
   line: number;
   message: string;
@@ -117,6 +139,7 @@ export function parseList(text: string): ParseResult {
 
   const doc: ListDocument = { title: "", type: "creator", creator: [], mine: [], notMine: [] };
   let sawMarker = false;
+  let inComment = false;
   let section: Section | null = null;
   let headerCols: string[] | null = null;
   let inHeaderBlock = true;
@@ -126,11 +149,19 @@ export function parseList(text: string): ParseResult {
     const line = raw.trim();
     const lineNo = n + 1;
     if (!line) continue;
+    if (inComment) {
+      if (line.includes("-->")) inComment = false;
+      continue;
+    }
     if (line === FORMAT_MARKER) {
       sawMarker = true;
       continue;
     }
-    if (line.startsWith("<!--")) continue;
+    if (line.startsWith("<!--")) {
+      // A comment that doesn't close on its own line swallows everything up to "-->".
+      if (!line.includes("-->")) inComment = true;
+      continue;
+    }
 
     if (line.startsWith("# ")) {
       // H1 is decorative; the Title header is authoritative.
@@ -286,6 +317,7 @@ export function serializeList(doc: ListDocument): string {
   const out: string[] = [];
   out.push(`# ${doc.title}`);
   out.push(FORMAT_MARKER);
+  out.push(READER_NOTE);
   out.push(`Title: ${doc.title}`);
   out.push(`Type: ${doc.type}`);
   if (doc.homepage) out.push(`Homepage: ${doc.homepage}`);

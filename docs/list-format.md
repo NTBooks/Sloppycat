@@ -10,6 +10,7 @@ Anything the parser doesn't recognize is ignored with a warning, so you can writ
 ```markdown
 # Jane Doe — verified catalog
 <!-- sloppycat/v1 -->
+<!-- What this file is and how to subscribe, for whoever follows the link. See "The reader note". -->
 Title: Jane Doe — verified catalog
 Type: creator
 Homepage: https://janedoe.example
@@ -46,6 +47,32 @@ Expires: 7 days
 | `Baseline-before` | no | ISO date. Items in `## Likely accurate` are presumed genuine because they predate it. |
 
 The `<!-- sloppycat/v1 -->` marker identifies the format. Its absence is a warning, not an error.
+
+## The reader note
+
+Comments are skipped, including ones that run over several lines, so a list can carry as much explanation
+as it wants without the parser complaining. Every list the extension writes carries this one, under the
+marker:
+
+```markdown
+<!--
+  This is a Sloppycat list. It says which releases on the profiles below are this creator's own
+  work, and which were published under their name by somebody else.
+
+  It reads fine as it is. To have it label what you see while you browse, install the extension:
+  https://ntbooks.github.io/Sloppycat/site/
+  Then open its options, find "List sources", paste the URL of this file, and press Add. After
+  that, anything under "Not mine" is marked, or hidden if you ask for that, on Spotify, Apple
+  Music, Deezer, Amazon, Goodreads and Google Books.
+
+  The format is documented here:
+  https://github.com/NTBooks/Sloppycat/blob/main/docs/list-format.md
+-->
+```
+
+The point is the link in your bio. Someone who follows it lands on a raw Markdown file with no page around
+it, and nothing else on it says what it is or where the thing that reads it lives. Edit the wording, or
+delete it; the parser doesn't care either way.
 
 ## Sections
 

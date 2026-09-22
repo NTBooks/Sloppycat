@@ -149,7 +149,9 @@ The wizard writes this for you at the end of the snapshot. Copy it, or download 
 with the file already filled in.
 
 **Publish it** anywhere with a plain URL. A public Gist is the least work. The raw URL is what people
-subscribe to.
+subscribe to. The file the wizard writes opens with a comment saying what it is, where to get the
+extension, and how to add the list, because someone following the link from your bio lands on raw Markdown
+with nothing else to go on. It's a comment, so it stays out of the way of anyone who already knows.
 
 **Optionally, prove it's you.** Paste that URL into a bio only you can edit: Spotify for Artists, Amazon
 Author Central, or a claimed Goodreads profile. The extension reads your bio, follows the link, and checks

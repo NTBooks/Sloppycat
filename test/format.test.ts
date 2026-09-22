@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expiresToMs, mergeCreatorDoc, parseDisclosure, parseList, serializeList } from "../src/lists/format";
+import { SITE_URL, SPEC_URL, expiresToMs, mergeCreatorDoc, parseDisclosure, parseList, serializeList } from "../src/lists/format";
 
 const SAMPLE = `# Jane Doe verified catalog
 <!-- sloppycat/v1 -->
@@ -55,6 +55,28 @@ describe("parseList", () => {
     const again = parseList(serializeList(d));
     expect(again.errors).toEqual([]);
     expect(again.doc).toEqual({ ...d, version: again.doc!.version });
+  });
+
+  it("writes a reader note pointing at the extension, and parses it back cleanly", () => {
+    const text = serializeList(parseList(SAMPLE).doc!);
+    expect(text).toContain(SITE_URL);
+    expect(text).toContain(SPEC_URL);
+    expect(text).toContain('find "List sources"');
+    const again = parseList(text);
+    expect(again.errors).toEqual([]);
+    expect(again.warnings).toEqual([]);
+    expect(again.doc!.title).toBe("Jane Doe verified catalog");
+  });
+
+  it("skips a comment that runs over several lines", () => {
+    const commented = SAMPLE.replace(
+      "Some prose the parser ignores.",
+      ["<!--", "Type: nonsense", "Title: hijacked", "| spotify | x | y |", "-->"].join("\n"),
+    );
+    const r = parseList(commented);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toEqual([]);
+    expect(r.doc!.title).toBe("Jane Doe verified catalog");
   });
 
   it("reports malformed rows with line numbers and rejects the doc", () => {
