@@ -10,7 +10,7 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 3px;
-  font: 700 10px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font: 700 10px/1 "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols 2", "DejaVu Sans", ui-monospace, monospace;
   vertical-align: middle;
   cursor: help;
   color: #0b0d0e;
@@ -58,7 +58,7 @@
 }
 .sloppycat-stub .sc-x {
   color: #ff5a51;
-  font: 700 12px/1 ui-monospace, Menlo, monospace;
+  font: 700 12px/1 "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols 2", "DejaVu Sans", ui-monospace, monospace;
   flex: none;
 }
 .sloppycat-stub .sc-msg {
@@ -120,7 +120,7 @@
   color: #5aa9ff;
 }
 .sloppycat-card .sc-glyph {
-  font: 700 12px/1 ui-monospace, Menlo, monospace;
+  font: 700 12px/1 "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols 2", "DejaVu Sans", ui-monospace, monospace;
   flex: none;
 }
 .sloppycat-card .sc-title {

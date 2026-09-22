@@ -250,13 +250,17 @@
   }
 
   .tag {
+    /* Symbol fonts first: without this Windows falls back to the emoji font and paints its own colours. */
+    font-family: "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols 2", "DejaVu Sans", ui-monospace, monospace;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-width: 16px;
     height: 16px;
     padding: 0 4px;
-    font: 600 10px/1 var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
     color: #0e1013;
     flex: none;
   }
@@ -314,7 +318,7 @@
     animation: settle 420ms ease-out 880ms both;
   }
   .slip .hd {
-    font: 600 10px/1 var(--mono);
+    font: 600 10px/1 "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols 2", "DejaVu Sans", ui-monospace, monospace;
     letter-spacing: 0.11em;
     text-transform: uppercase;
     color: var(--oxblood);
@@ -519,13 +523,18 @@
   <section class="opening">
     <div>
       <p class="label">For artists, authors, and anyone tired of it</p>
-      <h1>There's a song on your artist page <span class="quiet">and you didn't make it.</span></h1>
+      <h1>It watches your artist page <span class="quiet">for things you didn't put there.</span></h1>
       <p class="lede">
-        Here's how it gets there. Someone runs a track through an AI, signs up with a cheap distributor, and tells
-        them it's yours. Nobody checks. It shows up on your profile next to your real records and the royalties go
-        to them. Your fans think it's you. Same trick with books, except it's your name on a knockoff, or a title
-        one word off yours. <b>Sloppycat watches your profiles and tells you when something lands there that you
-        didn't put there.</b>
+        <b>Sloppycat checks your Spotify, Apple Music, Deezer, Amazon and Goodreads profiles on a timer, and tells
+        you when a release turns up that isn't yours. Then it writes the takedown.</b> Everyone else can subscribe
+        to lists of what artists say is actually theirs, so the fakes get marked on the page before anyone presses
+        play or buys a copy.
+      </p>
+      <p class="lede" style="margin-top: 16px">
+        Here's how the junk gets there. Someone runs a track through an AI, signs up with a cheap distributor, and
+        tells them it's yours. Nobody checks. It shows up next to your real records and the royalties go to them.
+        Your fans think it's you. Same trick with books, except it's your name on a knockoff, or a title one word
+        off yours.
       </p>
       <div class="buttons">
         <a class="solid" href="#install">Install it</a>
