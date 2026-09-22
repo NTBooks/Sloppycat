@@ -1,6 +1,6 @@
 {
   "name": "sloppycat",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Creator-verified catalogs, hijack alerts, and a scam-listing blocker for Spotify, Apple Music, Deezer, Amazon Books and Goodreads.",
   "type": "module",

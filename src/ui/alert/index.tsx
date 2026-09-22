@@ -17,6 +17,9 @@ function AlertRow(props: { alert: Alert; highlight: boolean }) {
     if (settings && !disclosure) setDisclosure(serializeDisclosure(settings.defaultDisclosure));
   }, [settings]);
   const profile = profiles?.[a.profileKey];
+  // A page you follow is someone else's: the letters here are written in the rights holder's voice,
+  // and "mine" / "not mine" are their words to say, not yours.
+  const following = !!profile?.watchOnly;
   const packet = buildPacket({
     item: a.item,
     profile,
@@ -30,7 +33,9 @@ function AlertRow(props: { alert: Alert; highlight: boolean }) {
         <div class="row">
           <Chip tone={a.change === "lookalike" || a.change === "count_drift" ? "warn" : "bad"}>
             {a.change === "added"
-              ? "New on your profile"
+              ? following
+                ? `New on ${profile?.displayName ?? "this page"}`
+                : "New on your profile"
               : a.change === "changed"
                 ? "Changed"
                 : a.change === "lookalike"
@@ -53,7 +58,7 @@ function AlertRow(props: { alert: Alert; highlight: boolean }) {
           </Button>
         </div>
       )}
-      {!a.resolution && a.change !== "count_drift" && (
+      {!a.resolution && a.change !== "count_drift" && !following && (
         <div class="stack">
           <div class="row">
             <input type="text" placeholder="disclosure if mine (text:human; cover:ai-assisted)" value={disclosure} onInput={(e) => setDisclosure((e.target as HTMLInputElement).value)} style="flex:1" />
@@ -75,11 +80,24 @@ function AlertRow(props: { alert: Alert; highlight: boolean }) {
           </div>
         </div>
       )}
-      {a.change === "count_drift" ? (
+      {!a.resolution && a.change !== "count_drift" && following && (
+        <div class="row">
+          <Button kind="ghost" onClick={() => void send({ type: "alert:resolve", alertId: a.id, resolution: "dismissed" })}>
+            Seen it
+          </Button>
+        </div>
+      )}
+      {following ? (
+        <div class="notice">
+          You follow {profile?.displayName ?? "this page"}, so this is a heads-up rather than something to file. If it looks wrong, the
+          person who can get it pulled is the artist: send them the link. If they publish a Sloppycat list, subscribing to it means their
+          own answer lands here instead.
+        </div>
+      ) : a.change === "count_drift" ? (
         <div class="stack">
           <div class="notice">
             Spotify only shows the ten newest albums and ten newest singles on an artist page, and a release can
-            carry any date its uploader typed. So something added with an old date sits in the middle of your
+            carry any date its uploader typed. So something added with an old date sits in the middle of the
             catalog where that view never reaches. The totals moved by more than what turned up at the top.
           </div>
           <div>
@@ -152,7 +170,7 @@ function Alerts() {
         <img src="../../icons/icon-48.png" alt="" />
         <h1>Alerts</h1>
       </div>
-      {open.length === 0 ? <Empty>No open alerts. Nothing new has appeared on your watched profiles.</Empty> : open.map((a) => <AlertRow key={a.id} alert={a} highlight={a.id === hash} />)}
+      {open.length === 0 ? <Empty>No open alerts. Nothing new has appeared on the pages you watch.</Empty> : open.map((a) => <AlertRow key={a.id} alert={a} highlight={a.id === hash} />)}
       {closed.length > 0 && (
         <details>
           <summary>Resolved ({closed.length})</summary>

@@ -226,6 +226,35 @@
     background: linear-gradient(140deg, #2f353b, #1b1f23);
     border: 1px solid #2a3035;
   }
+  /* Stand-in sleeves. Abstract on purpose: they keep the rows telling apart at a glance without
+     borrowing anybody's cover, and they are drawn rather than loaded, so nothing here needs a network. */
+  .cut .sleeve.s1 {
+    background:
+      radial-gradient(circle at 66% 34%, rgba(14, 16, 19, 0.75) 0 30%, transparent 31%),
+      linear-gradient(150deg, var(--amber), #9d5a1c);
+  }
+  .cut .sleeve.s2 {
+    background:
+      repeating-linear-gradient(135deg, rgba(14, 16, 19, 0.5) 0 5px, transparent 5px 13px),
+      linear-gradient(160deg, var(--oxblood), #7d2d2c);
+  }
+  .cut .sleeve.s3 {
+    background:
+      linear-gradient(
+        180deg,
+        transparent 0 26%,
+        rgba(14, 16, 19, 0.62) 26% 40%,
+        transparent 40% 56%,
+        rgba(14, 16, 19, 0.62) 56% 70%,
+        transparent 70%
+      ),
+      linear-gradient(200deg, var(--sage), #4e6b52);
+  }
+  .cut .sleeve.s4 {
+    background:
+      repeating-radial-gradient(circle at 50% 50%, rgba(14, 16, 19, 0.5) 0 3px, transparent 3px 8px),
+      linear-gradient(140deg, var(--slate), #46566b);
+  }
   .cut .t {
     font-family: var(--display);
     font-weight: 600;
@@ -528,7 +557,8 @@
         <b>Sloppycat checks your Spotify, Apple Music, Deezer, Amazon and Goodreads profiles on a timer, and tells
         you when a release turns up that isn't yours. Then it writes the takedown.</b> Everyone else can subscribe
         to lists of what artists say is actually theirs, so the fakes get marked on the page before anyone presses
-        play or buys a copy.
+        play or buys a copy. And if the page isn't yours, you can point it at an artist you follow and get told
+        the same way.
       </p>
       <p class="lede" style="margin-top: 16px">
         Here's how the junk gets there. Someone runs a track through an AI, signs up with a cheap distributor, and
@@ -548,21 +578,21 @@
       </div>
       <div class="device-body" id="rig">
         <div class="cut">
-          <div class="sleeve"></div>
+          <div class="sleeve s1"></div>
           <div>
             <div class="t"><span class="n">The Queen Is Dead</span><span class="tag yes">✓︎</span></div>
             <div class="m">Album · 1986 · WM UK</div>
           </div>
         </div>
         <div class="cut">
-          <div class="sleeve"></div>
+          <div class="sleeve s2"></div>
           <div>
             <div class="t"><span class="n">Strangeways, Here We Come</span><span class="tag yes">✓︎</span></div>
             <div class="m">Album · 1987 · WM UK</div>
           </div>
         </div>
         <div class="cut">
-          <div class="sleeve"></div>
+          <div class="sleeve s3"></div>
           <div>
             <div class="t"><span class="n">Rank</span><span class="tag old">◷︎</span></div>
             <div class="m">Album · 1988 · WM UK</div>
@@ -588,6 +618,11 @@
         Odd items get a note about what looked off, usually a label you've never heard of on something that turned
         up last week. That's a reason to look. It isn't proof of anything, and plenty of honest releases have one.
       </p>
+      <p>
+        The first thing it asks is whose page this is, and the rest of this section is the answer where it's
+        yours. If you're following somebody else's, it takes the snapshot and stops there. <a href="#fans">That
+        version is further down</a>, and it's shorter.
+      </p>
     </div>
     <aside class="margin">
       <h4>What it reads</h4>
@@ -603,11 +638,11 @@
     <figure>
       <img
         src="screenshot-review.png"
-        alt="The review screen: albums, singles and compilations in a list with tick boxes, one single flagged with two warnings"
-        width="1000"
-        height="1310"
+        alt="The review screen: albums and singles in a list with tick boxes, release dates, labels and a disclosure field on each row"
+        width="1033"
+        height="1111"
       />
-      <figcaption><b>Fig. 1</b> — Your catalog, grouped. The single that arrived on a label you've never used is flagged, not unticked.</figcaption>
+      <figcaption><b>Fig. 1</b> — Your catalog, grouped, with the disclosure written once at the top and carried down. You untick what isn't yours; nothing gets unticked for you.</figcaption>
     </figure>
     <aside class="margin">
       <h4>The bit that matters</h4>
@@ -624,7 +659,7 @@
     </aside>
   </section>
 
-  <section class="spread flip">
+  <section class="spread flip" id="fans">
     <aside class="margin">
       <h4>Reported cases</h4>
       <p>
@@ -653,6 +688,14 @@
         round. The blocker side is experimental and off until you turn it on, and it only works in the web player
         and on the sites themselves, not the desktop app and not your phone.
       </p>
+      <p>
+        You can also watch a page without waiting for anyone to publish anything. Open an artist or author you
+        follow, tell it the page isn't yours, and it takes one snapshot and watches from there, running the same
+        checks the artist would get. Nothing to write and nothing to publish, because their catalog isn't yours to
+        vouch for and you're not the one who can get a release pulled. What you get is an early heads up, and the
+        useful thing to do with it is tell the artist, who can. If they do keep a list, the last step offers to
+        subscribe you to it.
+      </p>
     </div>
   </section>
 
@@ -660,9 +703,9 @@
     <figure>
       <img
         src="screenshot-card.png"
-        alt="A discography with a verified album marked, and a card open showing vocals human and instruments human"
-        width="757"
-        height="520"
+        alt="A discography with four albums marked, and a card open on the verified one showing vocals human and instruments human"
+        width="1400"
+        height="720"
       />
       <figcaption><b>Fig. 2</b> — The card on hover. If part of a record was made with AI and the artist said so, that shows up here too.</figcaption>
     </figure>
@@ -762,9 +805,9 @@
       <p style="margin-top: 26px">
         <b>tl;dr:</b> people upload AI slop under other people's names and the platforms wave it through. You
         snapshot your own profile, untick what isn't yours, and it watches the page and writes your takedown
-        letters. Everyone else can subscribe to your list and see the junk marked before they press play. It
-        doesn't fix the hole. It does mean you find out in an hour instead of whenever a fan gets round to
-        emailing you.
+        letters. Everyone else can subscribe to your list and see the junk marked before they press play, or
+        point the same watching at a page they follow and be the fan who emails you. It doesn't fix the hole. It
+        does mean you find out in an hour instead of whenever somebody gets round to it.
       </p>
     </div>
   </section>
@@ -801,7 +844,7 @@
       var row = document.createElement("div");
       row.className = "cut wrong" + (still ? "" : " arriving");
       row.innerHTML =
-        '<div class="sleeve"></div><div><div class="t"><span class="n">Midnight Jazz Vibes</span>' +
+        '<div class="sleeve s4"></div><div><div class="t"><span class="n">Midnight Jazz Vibes</span>' +
         '<span class="tag no">✗︎</span></div><div class="m">Single · 2026 · 8412 Records DK</div></div>';
       var slip = document.createElement("div");
       slip.className = "slip";

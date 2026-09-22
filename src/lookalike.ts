@@ -26,11 +26,14 @@ export function tokenSetRatio(a: string, b: string): number {
   if (!ta.size || !tb.size) return 0;
   let inter = 0;
   for (const t of ta) if (tb.has(t)) inter++;
-  const smaller = Math.min(ta.size, tb.size);
   const union = ta.size + tb.size - inter;
-  // Containment dominates: "The Long Field: Summary & Analysis" fully contains the original, which is the
-  // classic clone pattern. Jaccard keeps a single shared word ("Blue" in "Blue Moon Rising") below threshold.
-  return 0.7 * (inter / smaller) + 0.3 * (inter / union);
+  // Containment dominates, but only in the clone's direction: a fake ADDS words to the real title, as in
+  // "The Long Field: Summary & Analysis" around "The Long Field". The reverse says nothing -- a candidate
+  // that is merely a subset of a watched title is usually a different work sharing a common phrase
+  // ("Birthday Boy" inside "Bunky Becky Birthday Boy") -- so it scores on overlap alone and stays quiet.
+  const candidateContainsWatched = inter === tb.size;
+  const jaccard = inter / union;
+  return candidateContainsWatched ? 0.7 + 0.3 * jaccard : jaccard;
 }
 
 /** Levenshtein on normalized strings, as a similarity ratio in [0,1]. */
@@ -57,6 +60,17 @@ export function editSimilarity(a: string, b: string): number {
 
 export function similarity(a: string, b: string): number {
   return Math.max(tokenSetRatio(a, b), editSimilarity(a, b));
+}
+
+/**
+ * Whether the platform credits a search hit to the same name as the profile being watched. When it does,
+ * the hit is that artist's own release under a second id -- market and deluxe editions each get one -- and
+ * not somebody trading on their name, so it is never a lookalike however well the titles match.
+ */
+export function sameCredit(candidateCredit: string | undefined, profileName: string | undefined): boolean {
+  const a = normalizeTitle(candidateCredit ?? "");
+  const b = normalizeTitle(profileName ?? "");
+  return a.length > 0 && a === b;
 }
 
 export const DEFAULT_LOOKALIKE_THRESHOLD = 0.82;

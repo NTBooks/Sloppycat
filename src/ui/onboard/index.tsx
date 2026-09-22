@@ -1,4 +1,7 @@
-// Onboarding wizard: Snapshot → Review → Generate → Publish → Claim → Watch.
+// Onboarding wizard. Two ways through it, and the first question is which one you're in:
+//   your own page:   Snapshot → Review → Generate → Publish & claim → Watch.
+//   someone else's:  Snapshot → see what's there → Watch. No list to write, nothing to claim,
+//                    because a catalog you don't own is not yours to vouch for.
 import { render } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { Button, Chip, CopyButton, Empty, SignalChips } from "../shared/components";
@@ -11,10 +14,16 @@ import { signalsFor } from "../../signals";
 import { mergeCreatorDoc, parseDisclosure, serializeDisclosure, serializeList } from "../../lists/format";
 import { buildPacket, packetAsText } from "../../remediation/packets";
 import { githubNewFileUrl } from "../../github";
+import { addSource } from "../../lists/sources";
 import * as storage from "../../storage";
 
 type Step = 0 | 1 | 2 | 3 | 4;
-const STEP_NAMES = ["Snapshot", "Review", "Generate", "Publish & claim", "Watching"];
+/** Whose page this is. "fan" skips everything that only an account holder can do. */
+type Role = "creator" | "fan";
+const STEP_NAMES: Record<Role, string[]> = {
+  creator: ["Snapshot", "Review", "Generate", "Publish & claim", "Watching"],
+  fan: ["Snapshot", "What's there now", "Watching"],
+};
 
 const KIND_ORDER: ItemKind[] = ["album", "ep", "single", "book", "unknown", "compilation", "appears_on"];
 const KIND_LABEL: Record<ItemKind, string> = {
@@ -37,11 +46,13 @@ interface Row {
   note: string;
 }
 
-function Steps(props: { step: Step }) {
+function Steps(props: { step: Step; role: Role }) {
+  // The fan path has three stops, and its last one is the wizard's step 4.
+  const at = props.role === "fan" ? Math.min(props.step, 2) : props.step;
   return (
     <div class="steps">
-      {STEP_NAMES.map((n, i) => (
-        <span key={n} class={`step ${i === props.step ? "active" : i < props.step ? "done" : ""}`}>
+      {STEP_NAMES[props.role].map((n, i) => (
+        <span key={n} class={`step ${i === at ? "active" : i < at ? "done" : ""}`}>
           {i + 1}. {n}
         </span>
       ))}
@@ -49,9 +60,46 @@ function Steps(props: { step: Step }) {
   );
 }
 
+/**
+ * What a snapshot looks like while it runs. It replaces the picker rather than sitting beside it:
+ * leaving a URL box on screen with a spinner next to it reads as "paste something", which is the
+ * one thing you should not do while a read is already going.
+ */
+function Working(props: { label: string; platform?: Platform }) {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSeconds((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const slow = props.platform === "spotify";
+  return (
+    <div class="card stack">
+      <h2>Reading {props.label || "the page"}…</h2>
+      <div class="progress">
+        <span />
+      </div>
+      <p class="muted" style="margin:0">
+        {slow ? (
+          <>
+            Spotify has no public API any more, so the page is opened in a background tab and read there. You may see the tab appear and
+            close again. Ten to twenty seconds is normal.
+          </>
+        ) : (
+          <>Fetching the public catalog. This is usually quick.</>
+        )}
+      </p>
+      <div class="muted mono" style="font-size:11px">
+        {seconds}s{seconds >= 30 ? " · taking longer than usual, it will stop by itself if the page never answers" : ""}
+      </div>
+    </div>
+  );
+}
+
 function Wizard() {
   const params = new URLSearchParams(location.search);
   const initialTabId = params.get("tabId") ? Number(params.get("tabId")) : undefined;
+  const initialRole = params.get("role") === "fan" ? "fan" : params.get("role") === "mine" ? "creator" : null;
+  const [role, setRole] = useState<Role | null>(initialRole);
   const [step, setStep] = useState<Step>(0);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -67,13 +115,24 @@ function Wizard() {
   const [repo, setRepo] = useState("");
   const [publishedUrl, setPublishedUrl] = useState("");
   const [verifyMsg, setVerifyMsg] = useState("");
+  const [snapTarget, setSnapTarget] = useState("");
+  const [snapPlatform, setSnapPlatform] = useState<Platform | undefined>(undefined);
+  const [theirList, setTheirList] = useState("");
+  const [subscribed, setSubscribed] = useState(false);
+  const [lookMsg, setLookMsg] = useState("");
+  const fan = role === "fan";
 
   useEffect(() => {
     void chrome.tabs.query({}).then((all) => setTabs(all.filter((t) => t.url && detectProfile(t.url))));
   }, []);
+  // The popup hands over both the tab and which case it is, so the snapshot starts once we know.
+  const [started, setStarted] = useState(false);
   useEffect(() => {
-    if (initialTabId) void snapshotTab(initialTabId);
-  }, []);
+    if (initialTabId && role && !started) {
+      setStarted(true);
+      void snapshotTab(initialTabId);
+    }
+  }, [role]);
   useEffect(() => {
     if (settings?.myListUrl && !publishedUrl) setPublishedUrl(settings.myListUrl);
   }, [settings]);
@@ -90,6 +149,8 @@ function Wizard() {
   }
 
   async function snapshotTab(tabId: number) {
+    const t = tabs.find((x) => x.id === tabId);
+    setSnapTarget(t?.title ?? "this page");
     setBusy("snap");
     setError("");
     try {
@@ -113,11 +174,12 @@ function Wizard() {
       setError("That doesn't look like a supported profile URL.");
       return;
     }
+    setSnapTarget(u);
     setBusy("snap");
     setError("");
     try {
       // Add as a watched profile and run once; the background does the fetch/render.
-      await send({ type: "profile:add", url: u });
+      await send({ type: "profile:add", url: u, watchOnly: fan });
       const key = `${det.platform}:${det.profileId}`;
       await send({ type: "run:now", profileKey: key });
       const snaps = await storage.get("snapshots");
@@ -177,6 +239,41 @@ function Wizard() {
     }
   }
 
+  /** The fan ending: record the profile and its first snapshot, and write nothing about ownership. */
+  async function follow() {
+    if (!detected || !result) return;
+    setBusy("commit");
+    try {
+      const profile: Profile = { platform: detected.platform, profileId: detected.profileId, url: detected.url, displayName: result.displayName, addedAt: new Date().toISOString(), watchOnly: true };
+      await send({ type: "snapshot:commit", profile, result });
+      // snapshot:commit keeps an existing row as-is, so say it separately: this one is not mine.
+      await send({ type: "profile:watchOnly", profileKey: `${detected.platform}:${detected.profileId}`, watchOnly: true });
+      if (result.bio) setTheirList(result.bio);
+      setStep(4);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  /** Ask the platform whether this artist's bio points at a list, so a fan can subscribe to it. */
+  async function lookForTheirList() {
+    if (!detected) return;
+    setBusy("look");
+    setLookMsg("");
+    try {
+      const r = await send<{ ok: boolean; reason?: string }>({ type: "verify:profile", profileKey: `${detected.platform}:${detected.profileId}` });
+      const p = (await storage.get("profiles"))[`${detected.platform}:${detected.profileId}`];
+      if (r.ok && p?.verifiedListUrl) {
+        setTheirList(p.verifiedListUrl);
+        setLookMsg("");
+      } else {
+        setLookMsg(r.reason ?? "No list linked from their bio yet.");
+      }
+    } finally {
+      setBusy("");
+    }
+  }
+
   const bioPlatforms = (doc?.creator ?? []).filter((c) => adapterFor(c.platform).supportsBio);
   const ghUrl = repo && listText.length < 6000 ? githubNewFileUrl(repo, listText) : "";
 
@@ -184,19 +281,68 @@ function Wizard() {
     <div class="page stack">
       <div class="brand">
         <img src="../../icons/icon-48.png" alt="" />
-        <h1>Snapshot your profile</h1>
+        <h1>{fan ? "Follow an artist's page" : role ? "Snapshot your profile" : "Set up Sloppycat"}</h1>
       </div>
-      <Steps step={step} />
+      {role && <Steps step={step} role={role} />}
       {error && <div class="notice bad">{error}</div>}
 
-      {step === 0 && (
+      {step === 0 && !role && (
+        <div class="card stack">
+          <h2>Whose page is this?</h2>
+          <p class="muted">The two answers do different work, so it's worth getting right. You can do both later, one page at a time.</p>
+          <div class="row" style="align-items:stretch;gap:12px">
+            <div class="card stack" style="flex:1">
+              <h3>It's mine</h3>
+              <p class="muted">
+                You're the artist or author. You'll go through your catalog, mark what's really yours, publish that list, and link it
+                from your bio so anyone can check a release against it.
+              </p>
+              <Button kind="primary" onClick={() => setRole("creator")}>
+                Set up my profile
+              </Button>
+            </div>
+            <div class="card stack" style="flex:1">
+              <h3>I follow them</h3>
+              <p class="muted">
+                Someone else's page. Sloppycat takes a snapshot and tells you when something new turns up on it, with the signals that
+                make a release worth a second look. <strong>No list to write and nothing to publish</strong> — their catalog isn't yours
+                to vouch for.
+              </p>
+              <Button kind="primary" onClick={() => setRole("fan")}>
+                Follow someone's page
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step === 0 && role && busy === "snap" && (
+        <Working label={snapTarget} platform={detectProfile(snapTarget)?.platform ?? snapPlatform} />
+      )}
+
+      {step === 0 && role && busy !== "snap" && (
         <div class="stack">
           <div class="card stack">
-            <h2>Pick your profile</h2>
+            <h2>{fan ? "Pick the page to follow" : "Pick your profile"}</h2>
             <p class="muted">
-              Open your own artist or author page in a tab, or paste its URL. Sloppycat reads the public catalog, you untick anything that
-              isn't yours, and the result becomes your verified list.
+              {fan ? (
+                <>
+                  Open the artist or author page in a tab, or paste its URL. Sloppycat reads the public catalog once as a baseline, then
+                  watches for what gets added to it.
+                </>
+              ) : (
+                <>
+                  Open your own artist or author page in a tab, or paste its URL. Sloppycat reads the public catalog, you untick anything
+                  that isn't yours, and the result becomes your verified list.
+                </>
+              )}
             </p>
+            <div class="row">
+              <Chip>{fan ? "Following someone else's page" : "This is my own page"}</Chip>
+              <Button kind="ghost" onClick={() => setRole(fan ? "creator" : "fan")}>
+                {fan ? "Actually, it's mine" : "Actually, I just follow them"}
+              </Button>
+            </div>
             {tabs.length > 0 && (
               <div class="stack">
                 <h3>Open tabs</h3>
@@ -204,7 +350,14 @@ function Wizard() {
                   const d = detectProfile(t.url!)!;
                   return (
                     <div class="row" key={t.id}>
-                      <Button kind="primary" onClick={() => snapshotTab(t.id!)} disabled={busy === "snap"}>
+                      <Button
+                        kind="primary"
+                        onClick={() => {
+                          setSnapPlatform(d.platform);
+                          void snapshotTab(t.id!);
+                        }}
+                        disabled={busy === "snap"}
+                      >
                         Snapshot
                       </Button>
                       <span>
@@ -228,8 +381,8 @@ function Wizard() {
               </Button>
             </form>
             <div class="muted" style="font-size:12px">
-              Spotify pages are read in a hidden window (Spotify has no public API anymore). Apple Music and Deezer use their public JSON.
-              Amazon and Goodreads pages are read through your own browser session.
+              Spotify pages are read in a background tab that opens and closes on its own (Spotify has no public API anymore). Apple Music
+              and Deezer use their public JSON. Amazon and Goodreads pages are read through your own browser session.
             </div>
           </div>
         </div>
@@ -244,54 +397,69 @@ function Wizard() {
                   {result.displayName ?? detected.profileId} <span class="muted">· {PLATFORM_LABEL[detected.platform]}</span>
                 </h2>
                 <div class="muted">
-                  {rows.length} items · {rows.filter((r) => r.mine).length} marked mine. Untick anything that isn't yours. Rows with a warning chip are worth a
-                  second look; nothing is unticked automatically.
+                  {fan ? (
+                    <>
+                      {rows.length} items on the page right now. This is the baseline, and there is nothing to tick: whatever shows up
+                      after it becomes an alert. Rows with a warning chip are worth a second look already.
+                    </>
+                  ) : (
+                    <>
+                      {rows.length} items · {rows.filter((r) => r.mine).length} marked mine. Untick anything that isn't yours. Rows with a
+                      warning chip are worth a second look; nothing is unticked automatically.
+                    </>
+                  )}
                 </div>
               </div>
+              {!fan && (
+                <div class="row">
+                  <Button onClick={() => setRows(rows.map((r) => ({ ...r, mine: true })))}>All mine</Button>
+                  <Button onClick={() => setRows(rows.map((r) => ({ ...r, mine: OFF_BY_DEFAULT.has(r.item.kind) ? false : r.mine })))}>Reset</Button>
+                </div>
+              )}
+            </div>
+            {!fan && (
               <div class="row">
-                <Button onClick={() => setRows(rows.map((r) => ({ ...r, mine: true })))}>All mine</Button>
-                <Button onClick={() => setRows(rows.map((r) => ({ ...r, mine: OFF_BY_DEFAULT.has(r.item.kind) ? false : r.mine })))}>Reset</Button>
+                <label style="margin:0">Disclosure for all mine:</label>
+                <input type="text" placeholder="text:human; cover:ai-assisted" style="flex:1" onChange={(e) => setRows(rows.map((r) => ({ ...r, disclosure: (e.target as HTMLInputElement).value })))} />
               </div>
-            </div>
-            <div class="row">
-              <label style="margin:0">Disclosure for all mine:</label>
-              <input type="text" placeholder="text:human; cover:ai-assisted" style="flex:1" onChange={(e) => setRows(rows.map((r) => ({ ...r, disclosure: (e.target as HTMLInputElement).value })))} />
-            </div>
+            )}
           </div>
           {result.partial && (
             <div class="notice">
-              Spotify's artist page only gives up the ten newest albums and ten newest singles, and it says you have
+              Spotify's artist page only gives up the ten newest albums and ten newest singles, and it says there are
               more than that. Open{" "}
               <a href={`${detected.url}/discography/all`} target="_blank" rel="noreferrer">
-                your full discography
-              </a>{" "}
-              while signed in, scroll to the bottom, then snapshot again to catch the rest. Worth doing: a fake can
-              be uploaded with an old date, which puts it in the middle of your catalog rather than at the top.
+                {fan ? "their full discography" : "your full discography"}
+              </a>
+              {fan ? "" : " while signed in"}, scroll to the bottom, then snapshot again to catch the rest. Worth doing: a fake can be
+              uploaded with an old date, which puts it in the middle of the catalog rather than at the top.
             </div>
           )}
           {rows.length === 0 && <Empty>Nothing was found on this page. If it's a Spotify artist page, try the "…/discography/all" view.</Empty>}
           {grouped.map((g) => (
             <details class="card group" key={g.kind} open={!OFF_BY_DEFAULT.has(g.kind)}>
               <summary>
-                {KIND_LABEL[g.kind]} ({g.idx.length}){OFF_BY_DEFAULT.has(g.kind) ? <span class="muted"> · off by default: usually other people's releases you appear on</span> : null}
+                {KIND_LABEL[g.kind]} ({g.idx.length}){OFF_BY_DEFAULT.has(g.kind) ? (
+                  <span class="muted"> · {fan ? "other people's releases they appear on" : "off by default: usually other people's releases you appear on"}</span>
+                ) : null}
               </summary>
               <table class="review">
                 <colgroup>
-                  <col class="c-mine" />
+                  {!fan && <col class="c-mine" />}
                   <col class="c-art" />
                   <col />
                   <col class="c-date" />
                   <col class="c-label" />
-                  <col class="c-note" />
+                  {!fan && <col class="c-note" />}
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>Mine</th>
+                    {!fan && <th>Mine</th>}
                     <th></th>
                     <th>Title</th>
                     <th>Date</th>
                     <th>Label / publisher</th>
-                    <th>Disclosure or note</th>
+                    {!fan && <th>Disclosure or note</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -299,10 +467,12 @@ function Wizard() {
                     const r = rows[i]!;
                     const sig = signalsFor(r.item, allItems);
                     return (
-                      <tr key={r.item.itemId} class={r.mine ? "" : "off"}>
-                        <td>
-                          <input type="checkbox" class="toggle" checked={r.mine} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, mine: (e.target as HTMLInputElement).checked } : x)))} />
-                        </td>
+                      <tr key={r.item.itemId} class={fan || r.mine ? "" : "off"}>
+                        {!fan && (
+                          <td>
+                            <input type="checkbox" class="toggle" checked={r.mine} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, mine: (e.target as HTMLInputElement).checked } : x)))} />
+                          </td>
+                        )}
                         <td>{r.item.imageUrl ? <img class="thumb t" src={r.item.imageUrl} alt="" /> : <div class="thumb t placeholder" />}</td>
                         <td>
                           <a href={r.item.url} target="_blank" rel="noreferrer">
@@ -313,13 +483,15 @@ function Wizard() {
                         </td>
                         <td class="date">{r.item.releaseDate ?? ""}</td>
                         <td class="label" title={r.item.label ?? ""}>{r.item.label ?? ""}</td>
-                        <td>
-                          {r.mine ? (
-                            <input type="text" value={r.disclosure} placeholder="text:human" onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, disclosure: (e.target as HTMLInputElement).value } : x)))} />
-                          ) : (
-                            <input type="text" value={r.note} placeholder="note: what happened" onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, note: (e.target as HTMLInputElement).value } : x)))} />
-                          )}
-                        </td>
+                        {!fan && (
+                          <td>
+                            {r.mine ? (
+                              <input type="text" value={r.disclosure} placeholder="text:human" onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, disclosure: (e.target as HTMLInputElement).value } : x)))} />
+                            ) : (
+                              <input type="text" value={r.note} placeholder="note: what happened" onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, note: (e.target as HTMLInputElement).value } : x)))} />
+                            )}
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -328,23 +500,36 @@ function Wizard() {
             </details>
           ))}
           <div class="card stack">
-            <div class="kv">
-              <label style="margin:0">List title</label>
-              <input type="text" value={listTitle} onInput={(e) => setListTitle((e.target as HTMLInputElement).value)} />
-              <label style="margin:0">Homepage (optional)</label>
-              <input type="url" value={homepage} placeholder="https://yoursite.example" onInput={(e) => setHomepage((e.target as HTMLInputElement).value)} />
-            </div>
+            {fan ? (
+              <p class="muted">
+                Nothing here gets published and nothing leaves this browser. Sloppycat keeps the snapshot locally and compares the page
+                against it from now on.
+              </p>
+            ) : (
+              <div class="kv">
+                <label style="margin:0">List title</label>
+                <input type="text" value={listTitle} onInput={(e) => setListTitle((e.target as HTMLInputElement).value)} />
+                <label style="margin:0">Homepage (optional)</label>
+                <input type="url" value={homepage} placeholder="https://yoursite.example" onInput={(e) => setHomepage((e.target as HTMLInputElement).value)} />
+              </div>
+            )}
             <div class="row" style="justify-content:space-between">
               <Button onClick={() => setStep(0)}>Back</Button>
-              <Button kind="primary" onClick={commit} disabled={busy === "commit" || rows.length === 0}>
-                Generate my list{notMineRows.length ? ` (${notMineRows.length} not mine)` : ""}
-              </Button>
+              {fan ? (
+                <Button kind="primary" onClick={follow} disabled={busy === "commit" || rows.length === 0}>
+                  {busy === "commit" ? "Saving…" : "Watch this page"}
+                </Button>
+              ) : (
+                <Button kind="primary" onClick={commit} disabled={busy === "commit" || rows.length === 0}>
+                  Generate my list{notMineRows.length ? ` (${notMineRows.length} not mine)` : ""}
+                </Button>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {step === 2 && doc && (
+      {step === 2 && doc && !fan && (
         <div class="stack">
           {notMineRows.length > 0 && (
             <div class="card stack">
@@ -405,7 +590,7 @@ function Wizard() {
         </div>
       )}
 
-      {step === 3 && doc && (
+      {step === 3 && doc && !fan && (
         <div class="stack">
           <div class="card stack">
             <h2>1. Publish the list somewhere public</h2>
@@ -489,7 +674,89 @@ function Wizard() {
         </div>
       )}
 
-      {step === 4 && (
+      {step === 4 && fan && (
+        <div class="stack">
+          <div class="card stack">
+            <h2>Following {result?.displayName ?? detected?.profileId}</h2>
+            <p>
+              Sloppycat checks this page every {settings?.intervalMinutes ?? 60} minutes while Chrome is open, and tells you when something
+              new appears on it: a first-time label, a release dated into the back catalog, a title that shadows one already there.
+            </p>
+            <p class="muted">
+              There is nothing to publish here. The list, the bio link and the takedown letters are for the account holder, and this
+              account isn't yours. What you can do with an alert is tell the artist, who can then act on it.
+            </p>
+          </div>
+          <div class="card stack">
+            <h2>Their list, if they keep one</h2>
+            {theirList ? (
+              <div class="stack">
+                <p class="muted">
+                  {result?.displayName ?? "This artist"} links a Sloppycat list from their bio, which means the account holder put it
+                  there. Subscribe and their own "not mine" rows show up on the page and in your alerts.
+                </p>
+                <div class="muted" style="font-size:12px;word-break:break-all">{theirList}</div>
+                <div class="row">
+                  <Button
+                    kind="primary"
+                    disabled={subscribed || busy === "sub"}
+                    onClick={async () => {
+                      setBusy("sub");
+                      try {
+                        await addSource(theirList);
+                        setSubscribed(true);
+                      } catch (e) {
+                        setLookMsg(e instanceof Error ? e.message : String(e));
+                      } finally {
+                        setBusy("");
+                      }
+                    }}
+                  >
+                    {subscribed ? "Subscribed" : busy === "sub" ? "Subscribing…" : "Subscribe to their list"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div class="stack">
+                <p class="muted">
+                  If they publish one and link it from their bio, subscribing means you see what they disown without waiting to work it
+                  out yourself. Most artists don't have one yet; the community list you already subscribe to covers some of the gap.
+                </p>
+                <div class="row">
+                  <Button disabled={busy === "look"} onClick={() => void lookForTheirList()}>
+                    {busy === "look" ? "Looking…" : "Look for their list"}
+                  </Button>
+                </div>
+              </div>
+            )}
+            {lookMsg && <div class="notice">{lookMsg}</div>}
+          </div>
+          <div class="card row">
+            <Button
+              kind="primary"
+              onClick={() => {
+                setStep(0);
+                setResult(null);
+                setRows([]);
+                setDetected(null);
+                setTheirList("");
+                setSubscribed(false);
+                setLookMsg("");
+                setError("");
+              }}
+            >
+              Follow another page
+            </Button>
+            <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/following/index.html") })}>
+              Everyone you follow
+            </Button>
+            <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/alert/index.html") })}>Alerts</Button>
+            <Button onClick={() => void chrome.runtime.openOptionsPage()}>Open settings</Button>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && !fan && (
         <div class="card stack">
           <h2>Watching {result?.displayName ?? detected?.profileId}</h2>
           <p>

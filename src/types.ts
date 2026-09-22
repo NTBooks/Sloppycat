@@ -47,6 +47,11 @@ export interface Profile {
   lastError?: string;
   verified?: boolean;
   verifiedListUrl?: string;
+  /**
+   * Someone else's page, followed as a fan. There is nothing here to claim and no list to publish:
+   * the point is being told when something new turns up, and what the artist's own list says about it.
+   */
+  watchOnly?: boolean;
 }
 
 export interface Snapshot {
@@ -176,9 +181,15 @@ export interface Experiments {
   blockFlagged: boolean;
   /** Scan an open library or shelf page for items on your lists. */
   slopscan: boolean;
+  /**
+   * Search the platform for titles resembling the ones you watch, beyond the profile page itself.
+   * Guesswork by construction: it reads titles, not provenance, so most of what it turns up is a
+   * coincidence rather than a hijack.
+   */
+  lookalikeSearch: boolean;
 }
 
-export const DEFAULT_EXPERIMENTS: Experiments = { blocker: false, blockFlagged: false, slopscan: false };
+export const DEFAULT_EXPERIMENTS: Experiments = { blocker: false, blockFlagged: false, slopscan: false, lookalikeSearch: false };
 
 export interface Settings {
   mode: "creator" | "consumer" | "both";
@@ -217,7 +228,8 @@ export function itemKey(i: { platform: Platform; itemId: string }): string {
 /** Messages between UI/content scripts and the background worker. */
 export type Message =
   | { type: "run:now"; profileKey?: string }
-  | { type: "profile:add"; url: string }
+  | { type: "profile:add"; url: string; watchOnly?: boolean }
+  | { type: "profile:watchOnly"; profileKey: string; watchOnly: boolean }
   | { type: "profile:remove"; profileKey: string }
   | {
       type: "alert:resolve";

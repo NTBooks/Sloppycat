@@ -5,6 +5,7 @@ import * as storage from "./storage";
 import { adapterFor, detectProfile, type FetchContext } from "./adapters";
 import { diffSnapshots } from "./diff";
 import { signalsFor, lookalikeSignal } from "./signals";
+import { sameCredit } from "./lookalike";
 import { ensureDefaultSources, refreshAll, lookup, unprovenClaims } from "./lists/sources";
 import { MAX_CHANGES, summarize } from "./lists/changes";
 import { verifyProfile, runClaimCheck } from "./lists/verify";
@@ -60,9 +61,45 @@ storage.onChange(["settings"], () => void scheduleAlarms());
 // ---------- hidden-tab rendering ----------
 
 let renderQueue: Promise<unknown> = Promise.resolve();
+let pendingRenders = 0;
 let hiddenWindowId: number | undefined;
 
+/**
+ * A window of our own is the last resort, not the first. Chrome has no hidden window: "minimized" is
+ * a request Windows regularly ignores for popups, so what the user gets is a blank window in front of
+ * their work every time a check runs. A background tab in a window they already have open is quieter
+ * in every way, so that is the normal path and this only covers the case where there is no window at
+ * all to put a tab in.
+ *
+ * The worker is suspended between runs, and an in-memory id does not survive that, so a window it
+ * opened would be orphaned on screen and the next run would open another one. Session storage lasts
+ * exactly as long as the browser does, which is the same life as the window.
+ */
+const HIDDEN_WINDOW_KEY = "hiddenWindowId";
+
+async function rememberHiddenWindow(id: number | undefined): Promise<void> {
+  try {
+    if (id === undefined) await chrome.storage.session.remove(HIDDEN_WINDOW_KEY);
+    else await chrome.storage.session.set({ [HIDDEN_WINDOW_KEY]: id });
+  } catch {
+    /* session storage is best effort; losing it only costs one stray window */
+  }
+}
+
+async function adoptHiddenWindow(): Promise<number | undefined> {
+  try {
+    const stored = (await chrome.storage.session.get(HIDDEN_WINDOW_KEY))[HIDDEN_WINDOW_KEY];
+    if (typeof stored !== "number") return undefined;
+    await chrome.windows.get(stored);
+    return stored;
+  } catch {
+    await rememberHiddenWindow(undefined);
+    return undefined;
+  }
+}
+
 async function getHiddenWindow(): Promise<number> {
+  if (hiddenWindowId === undefined) hiddenWindowId = await adoptHiddenWindow();
   if (hiddenWindowId !== undefined) {
     try {
       await chrome.windows.get(hiddenWindowId);
@@ -73,7 +110,51 @@ async function getHiddenWindow(): Promise<number> {
   }
   const w = await chrome.windows.create({ url: "about:blank", state: "minimized", focused: false, type: "popup" });
   hiddenWindowId = w.id!;
+  await rememberHiddenWindow(hiddenWindowId);
+  // Windows often ignores "minimized" on a popup at creation time and draws it anyway, so say it
+  // again once the window exists. Without this you get a blank window sitting on top of your work.
+  try {
+    await chrome.windows.update(hiddenWindowId, { state: "minimized", focused: false });
+  } catch {
+    /* the window can be gone already; the next call makes a new one */
+  }
   return hiddenWindowId;
+}
+
+/** Nothing left to render, so nothing should be left on screen either. */
+async function closeHiddenWindow(): Promise<void> {
+  const id = hiddenWindowId ?? (await adoptHiddenWindow());
+  hiddenWindowId = undefined;
+  await rememberHiddenWindow(undefined);
+  if (id === undefined) return;
+  try {
+    await chrome.windows.remove(id);
+  } catch {
+    /* already closed */
+  }
+}
+
+// Closed by hand, or gone with its last tab: either way stop pointing at it.
+chrome.windows.onRemoved.addListener((id) => {
+  if (id === hiddenWindowId) {
+    hiddenWindowId = undefined;
+    void rememberHiddenWindow(undefined);
+  }
+});
+
+// A worker that starts with no render in flight has no use for a window a previous one left open.
+// Queued rather than fired off, so it can never close a window a run starting this instant just took.
+renderQueue = renderQueue.then(() => (pendingRenders === 0 ? closeHiddenWindow() : undefined));
+
+/** A normal window to park a background tab in, preferring one that is actually on screen. */
+async function hostWindowId(): Promise<number | undefined> {
+  try {
+    const wins = await chrome.windows.getAll({ windowTypes: ["normal"] });
+    if (!wins.length) return undefined;
+    return (wins.find((w) => w.focused) ?? wins.find((w) => w.state !== "minimized") ?? wins[0])?.id;
+  } catch {
+    return undefined;
+  }
 }
 
 function waitForLoad(tabId: number, timeoutMs: number): Promise<void> {
@@ -170,8 +251,10 @@ export async function extractFromTab(tabId: number, platform: Platform, profileI
 }
 
 function render(url: string, platform: Platform, profileId: string): Promise<ExtractResult> {
+  pendingRenders++;
   const job = renderQueue.then(async () => {
-    const windowId = await getHiddenWindow();
+    // A background tab in an ordinary window: never focused, gone again in a few seconds.
+    const windowId = (await hostWindowId()) ?? (await getHiddenWindow());
     const tab = await chrome.tabs.create({ windowId, url, active: false });
     try {
       await waitForLoad(tab.id!, 20000);
@@ -185,7 +268,11 @@ function render(url: string, platform: Platform, profileId: string): Promise<Ext
       }
     }
   });
-  renderQueue = job.catch(() => undefined);
+  // The window is a tool, not a place: it goes away as soon as the last render in the queue is done.
+  renderQueue = job.catch(() => undefined).then(async () => {
+    pendingRenders--;
+    if (pendingRenders === 0) await closeHiddenWindow();
+  });
   return job;
 }
 
@@ -234,7 +321,8 @@ export async function runAll(): Promise<void> {
     if (settings.mode === "consumer") return;
     const profiles = await storage.get("profiles");
     const counter = await storage.update("runCounter", (n) => n + 1);
-    const doLookalike = counter % Math.max(1, settings.lookalikeEveryNRuns) === 0;
+    const doLookalike =
+      settings.experiments.lookalikeSearch && counter % Math.max(1, settings.lookalikeEveryNRuns) === 0;
     for (const p of Object.values(profiles)) {
       await runProfile(p, doLookalike);
       await new Promise((r) => setTimeout(r, 2000 + Math.random() * 3000));
@@ -342,15 +430,16 @@ export async function ingestSnapshot(profile: Profile, result: ExtractResult, do
     const existing = await storage.get("alerts");
     const alreadyAlerted = new Set(Object.values(existing).map((a) => itemKey(a.item)));
     // Search the most recent few titles; that is where clones cluster.
+    const owner = result.displayName ?? profile.displayName;
     for (const w of watched.slice(0, 3)) {
       try {
         const found = await adapter.searchLookalikes(w.title, c);
         for (const cand of found) {
           if (items.some((i) => i.itemId === cand.itemId)) continue;
           if (alreadyAlerted.has(itemKey(cand))) continue;
+          if (sameCredit(cand.subtitle, owner)) continue;
           const sig = lookalikeSignal(cand, [w]);
           if (!sig) continue;
-          // Skip if the platform attributes it to the same creator string and it's already on the profile.
           alreadyAlerted.add(itemKey(cand));
           newAlerts.push({
             id: crypto.randomUUID(),
@@ -413,9 +502,9 @@ async function notify(profile: Profile, alerts: Alert[]): Promise<void> {
 async function notifyListChanges(changes: ListChange[]): Promise<void> {
   if (!changes.length) return;
   const settings = await storage.get("settings");
+  // Gated on its own toggle only: watching pages without badging them is what following an artist
+  // looks like, and that is exactly when a list you subscribe to changing its mind matters.
   if (!settings.notifications || !settings.listUpdates) return;
-  // A creator-only install subscribes to lists to check its own claims, not to follow other people.
-  if (settings.mode === "creator") return;
   const { title, message } = summarize(changes);
   await chrome.notifications.create(`lists:${changes[0]!.id}`, {
     type: "basic",
@@ -482,6 +571,9 @@ async function resolveAlert(
 
   const profiles = await storage.get("profiles");
   const p = profiles[a.profileKey];
+  // A page you follow as a fan is not yours to speak for: resolving there records what you decided and
+  // stops. Writing it into your own list would put someone else's profile in your Creator table.
+  if (p?.watchOnly) return;
   const settings = await storage.get("settings");
   const existing = await storage.get("myList");
   const creator = p ? [{ platform: p.platform, profile: p.url }] : [];
@@ -518,10 +610,15 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         const m = msg as Extract<Message, { type: "profile:add" }>;
         const det = detectProfile(m.url);
         if (!det) return { ok: false, error: "Not a recognized profile URL" };
-        const profile: Profile = { platform: det.platform, profileId: det.profileId, url: det.url, addedAt: new Date().toISOString() };
+        const profile: Profile = { platform: det.platform, profileId: det.profileId, url: det.url, addedAt: new Date().toISOString(), watchOnly: m.watchOnly };
         await storage.update("profiles", (all) => ({ ...all, [keyOf(profile)]: all[keyOf(profile)] ?? profile }));
         void runProfile(profile, false);
         return { ok: true, profileKey: keyOf(profile) };
+      }
+      case "profile:watchOnly": {
+        const m = msg as Extract<Message, { type: "profile:watchOnly" }>;
+        await storage.update("profiles", (all) => (all[m.profileKey] ? { ...all, [m.profileKey]: { ...all[m.profileKey]!, watchOnly: m.watchOnly } } : all));
+        return { ok: true };
       }
       case "profile:remove": {
         const m = msg as Extract<Message, { type: "profile:remove" }>;
