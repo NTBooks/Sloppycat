@@ -24,9 +24,9 @@ see the fakes flagged on the page before they press play or buy.
 
 ## Contents
 
-- [Install it](#install-it) — it's not in the store yet, so you load it unpacked
+- [Install it](#install-it) — pending store review, so you load it unpacked for now
 - [For artists and authors](#for-artists-and-authors) — snapshot, alerts, takedowns
-- [Make your own list](#make-your-own-list) — publish it, prove it's you
+- [Make your own list](#make-your-own-list) — publish it, optionally prove it's you
 - [For slopblockers](#for-slopblockers) — subscribe, badges, uBlock export
 - [How it gets the data](#how-it-gets-the-data)
 - [What it won't do](#what-it-wont-do)
@@ -36,7 +36,9 @@ see the fakes flagged on the page before they press play or buy.
 
 ## Install it
 
-Nothing is published to the Chrome Web Store yet. Build it and load the folder.
+It's submitted to the Chrome Web Store and waiting on review, so there's no install link yet. An
+extension asking for this many host permissions tends to draw a slower look than a trivial one, so I'd
+expect this section to be here a while. Until it clears, build it and load the folder.
 
 ```powershell
 npm install
