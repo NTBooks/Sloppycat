@@ -6,7 +6,8 @@ import { adapterFor, detectProfile, type FetchContext } from "./adapters";
 import { diffSnapshots } from "./diff";
 import { isGone, RENDER_CLOSED, RenderBudget } from "./render-guard";
 import { signalsFor, lookalikeSignal } from "./signals";
-import { ensureDefaultSources, refreshAll, lookup, unprovenClaims } from "./lists/sources";
+import { addSource, ensureDefaultSources, refreshAll, lookup, unprovenClaims } from "./lists/sources";
+import { hasListAccess, hostOf } from "./lists/permissions";
 import { MAX_CHANGES, summarize } from "./lists/changes";
 import { verifyProfile, runClaimCheck } from "./lists/verify";
 import { getClaim, isFresh } from "./lists/claims";
@@ -496,10 +497,10 @@ export async function runProfile(profile: Profile, doLookalike: boolean): Promis
   const c = ctx();
   const who = profile.displayName ?? profile.profileId;
   try {
-    // The bio comes back with the snapshot on every platform that has one, so looking for the list
-    // link costs nothing extra once the page is already open. A page you follow has no list of
-    // yours to find, so it is not read and not asked about.
-    const wantBio = adapter.supportsBio && !profile.watchOnly;
+    // The bio comes back with the snapshot on every platform that has one, so reading it costs
+    // nothing extra once the page is already open. On your own page it is checked for your list
+    // link; on a page you follow it is where their list would be announced.
+    const wantBio = adapter.supportsBio;
     const result = await adapter.fetchSnapshot(profile.profileId, c, { withBio: wantBio });
     await log(`${who}: found ${result.items.length} release${result.items.length === 1 ? "" : "s"}`);
     await ingestSnapshot(profile, result, doLookalike);
@@ -507,7 +508,10 @@ export async function runProfile(profile: Profile, doLookalike: boolean): Promis
       ...all,
       [key]: { ...all[key]!, lastRunAt: c.now, lastError: undefined, displayName: result.displayName ?? all[key]!.displayName },
     }));
-    if (wantBio) await checkOwnList(profile, result.bio);
+    if (wantBio) {
+      if (profile.watchOnly) await findTheirList(profile, result.bio);
+      else await checkOwnList(profile, result.bio);
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await log(`${who}: ${msg}`, true);
@@ -516,6 +520,38 @@ export async function runProfile(profile: Profile, doLookalike: boolean): Promis
       [key]: { ...all[key]!, lastRunAt: c.now, lastError: msg },
     }));
   }
+}
+
+/**
+ * Look for a list the artist publishes, on a page the user follows.
+ *
+ * Finding it was a button the user had to know to press, which is the wrong way round: the check
+ * already opens the page and already reads the bio, so the link is sitting there either way. The
+ * bio is the proof as well as the announcement - only the account holder can edit it - so a list
+ * found this way is one the artist put their name to, and it is subscribed to on the spot.
+ *
+ * The exception is a list on a host the extension has no permission for. Chrome only grants those
+ * from a click, which a background check does not have, so it is recorded and the page offers it.
+ */
+async function findTheirList(profile: Profile, bio: string | undefined): Promise<{ listUrl?: string; subscribed: boolean; reason?: string }> {
+  const key = keyOf(profile);
+  const who = profile.displayName ?? profile.profileId;
+  await log(`${who}: looking for a list they publish`);
+  const v = await verifyProfile(profile, bio);
+  await storage.update("profiles", (all) => ({ ...all, [key]: { ...all[key]!, verifiedListUrl: v.ok ? v.listUrl : undefined } }));
+  if (!v.ok || !v.listUrl) {
+    await log(`${who}: ${v.reason ?? "no list linked from their bio"}`);
+    return { subscribed: false, reason: v.reason };
+  }
+  const sources = await storage.get("listSources");
+  if (sources.some((x) => x.url === v.listUrl)) return { listUrl: v.listUrl, subscribed: true };
+  if (!(await hasListAccess(v.listUrl))) {
+    await log(`${who}: publishes a list at ${hostOf(v.listUrl)}, which needs your permission before it can be read`, true);
+    return { listUrl: v.listUrl, subscribed: false, reason: "needs-permission" };
+  }
+  await addSource(v.listUrl);
+  await log(`${who}: subscribed to the list they publish`);
+  return { listUrl: v.listUrl, subscribed: true };
 }
 
 /**
@@ -847,6 +883,14 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         const m = msg as Extract<Message, { type: "claims:check" }>;
         const claim = await runClaimCheck(m.listUrl, m.platform, ctx());
         return { ok: claim.state === "verified", claim };
+      }
+      case "list:fromBio": {
+        // The wizard has just taken a snapshot and holds the bio, so this costs no second page load.
+        const m = msg as Extract<Message, { type: "list:fromBio" }>;
+        const p = (await storage.get("profiles"))[m.profileKey];
+        if (!p) return { ok: false, error: "Unknown profile" };
+        const r = await findTheirList(p, m.bio);
+        return { ok: true, ...r };
       }
       case "verify:profile": {
         const m = msg as Extract<Message, { type: "verify:profile" }>;

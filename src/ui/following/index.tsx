@@ -4,12 +4,13 @@
 // rather than a table in Settings between the GitHub sign-in and the disclosure defaults. Pages you
 // follow come first; your own are listed under them, because there the wizard is the place to go.
 import { render } from "preact";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { Button, Chip, Empty } from "../shared/components";
 import { useStorage } from "../shared/hooks";
 import { fmtDate, send } from "../shared/rpc";
 import { PLATFORM_LABEL, type Alert, type Profile, type Snapshot } from "../../types";
 import { normalizeListUrl } from "../../adapters/shared";
+import { hasListAccess, hostOf, requestListAccess } from "../../lists/permissions";
 import { addSource } from "../../lists/sources";
 
 /** A few covers off the last snapshot, so a row reads as an artist rather than a record. */
@@ -30,6 +31,18 @@ function TheirList(props: { profileKey: string; profile: Profile; subscribed: bo
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const url = profile.verifiedListUrl;
+  // A list on a host already covered is subscribed to by the check itself, so the only reason to
+  // see a button here is a host Chrome will not grant without a click. Asked rather than assumed,
+  // because the answer changes when the user grants or revokes a host.
+  const [needsGrant, setNeedsGrant] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    if (!url) return;
+    void hasListAccess(url).then((ok) => alive && setNeedsGrant(!ok));
+    return () => {
+      alive = false;
+    };
+  }, [url]);
 
   if (url && props.subscribed) {
     return (
@@ -44,6 +57,7 @@ function TheirList(props: { profileKey: string; profile: Profile; subscribed: bo
       <div class="stack" style="gap:6px">
         <div class="facts" style="word-break:break-all">
           They publish a list, linked from their own bio: {url}
+          {needsGrant ? `. It is on ${hostOf(url)}, which Sloppycat cannot read without your say-so.` : ""}
         </div>
         <div class="row">
           <Button
@@ -51,8 +65,15 @@ function TheirList(props: { profileKey: string; profile: Profile; subscribed: bo
             disabled={busy === "sub"}
             onClick={async () => {
               setBusy("sub");
+              // Chrome only grants a host from a click, which is why this one step is left to you.
+              if (needsGrant && !(await requestListAccess(url))) {
+                setMsg(`Sloppycat needs your permission to read ${hostOf(url)} before it can fetch their list.`);
+                setBusy("");
+                return;
+              }
               try {
                 await addSource(url);
+                setMsg("");
               } catch (e) {
                 setMsg(e instanceof Error ? e.message : String(e));
               } finally {
@@ -60,7 +81,7 @@ function TheirList(props: { profileKey: string; profile: Profile; subscribed: bo
               }
             }}
           >
-            {busy === "sub" ? "Subscribing…" : "Subscribe to their list"}
+            {busy === "sub" ? "Subscribing…" : needsGrant ? `Allow ${hostOf(url)} and subscribe` : "Subscribe to their list"}
           </Button>
           {msg && <span class="facts" style="color:var(--bad)">{msg}</span>}
         </div>
@@ -68,24 +89,8 @@ function TheirList(props: { profileKey: string; profile: Profile; subscribed: bo
     );
   }
   return (
-    <div class="row">
-      <Button
-        disabled={busy === "look"}
-        title="Read their bio on the platform and see whether it links to a Sloppycat list"
-        onClick={async () => {
-          setBusy("look");
-          setMsg("");
-          try {
-            const r = await send<{ ok: boolean; reason?: string }>({ type: "verify:profile", profileKey: props.profileKey });
-            if (!r.ok) setMsg(r.reason ?? "No list linked from their bio yet.");
-          } finally {
-            setBusy("");
-          }
-        }}
-      >
-        {busy === "look" ? "Looking…" : "Look for their list"}
-      </Button>
-      {msg && <span class="facts">{msg}</span>}
+    <div class="facts">
+      No list linked from their bio yet. Every check looks again and subscribes for you if one appears.
     </div>
   );
 }

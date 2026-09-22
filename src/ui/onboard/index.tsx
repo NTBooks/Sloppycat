@@ -250,27 +250,17 @@ function Wizard() {
       await send({ type: "snapshot:commit", profile, result });
       // snapshot:commit keeps an existing row as-is, so say it separately: this one is not mine.
       await send({ type: "profile:watchOnly", profileKey: `${detected.platform}:${detected.profileId}`, watchOnly: true });
-      if (result.bio) setTheirList(result.bio);
       setStep(4);
-    } finally {
-      setBusy("");
-    }
-  }
-
-  /** Ask the platform whether this artist's bio points at a list, so a fan can subscribe to it. */
-  async function lookForTheirList() {
-    if (!detected) return;
-    setBusy("look");
-    setLookMsg("");
-    try {
-      const r = await send<{ ok: boolean; reason?: string }>({ type: "verify:profile", profileKey: `${detected.platform}:${detected.profileId}` });
-      const p = (await storage.get("profiles"))[`${detected.platform}:${detected.profileId}`];
-      if (r.ok && p?.verifiedListUrl) {
-        setTheirList(p.verifiedListUrl);
-        setLookMsg("");
-      } else {
-        setLookMsg(r.reason ?? "No list linked from their bio yet.");
-      }
+      // The snapshot already read their bio, so look for their list with what is in hand rather
+      // than making this a button. No second page load, and nothing for the reader to go and do.
+      const r = await send<{ ok: boolean; listUrl?: string; subscribed?: boolean; reason?: string }>({
+        type: "list:fromBio",
+        profileKey: `${detected.platform}:${detected.profileId}`,
+        bio: result.bio,
+      });
+      setTheirList(r.listUrl ?? "");
+      setSubscribed(!!r.subscribed);
+      setLookMsg(r.listUrl && !r.subscribed ? `Their list is on ${hostOf(r.listUrl)}, which Sloppycat needs your permission to read.` : "");
     } finally {
       setBusy("");
     }
@@ -713,23 +703,38 @@ function Wizard() {
             </p>
           </div>
           <div class="card stack">
-            <h2>Their list, if they keep one</h2>
-            {theirList ? (
+            <h2>Their list</h2>
+            {theirList && subscribed ? (
               <div class="stack">
                 <p class="muted">
-                  {result?.displayName ?? "This artist"} links a Sloppycat list from their bio, which means the account holder put it
-                  there. Subscribe and their own "not mine" rows show up on the page and in your alerts.
+                  {result?.displayName ?? "This artist"} publishes a list and links it from their bio, which only the account holder
+                  can edit. You are subscribed to it, so anything they disown shows up on the page and in your alerts.
+                </p>
+                <div class="muted" style="font-size:12px;word-break:break-all">{theirList}</div>
+              </div>
+            ) : theirList ? (
+              <div class="stack">
+                <p class="muted">
+                  {result?.displayName ?? "This artist"} publishes a list, and it is hosted on {hostOf(theirList)}, which Sloppycat
+                  cannot read without your say-so. Chrome will name the host and you can decline.
                 </p>
                 <div class="muted" style="font-size:12px;word-break:break-all">{theirList}</div>
                 <div class="row">
                   <Button
                     kind="primary"
-                    disabled={subscribed || busy === "sub"}
+                    disabled={busy === "sub"}
                     onClick={async () => {
                       setBusy("sub");
+                      // The grant has to come from this click; Chrome will not take it from a check.
+                      if (!(await requestListAccess(theirList))) {
+                        setLookMsg(`Sloppycat needs your permission to read ${hostOf(theirList)} before it can fetch their list.`);
+                        setBusy("");
+                        return;
+                      }
                       try {
                         await addSource(theirList);
                         setSubscribed(true);
+                        setLookMsg("");
                       } catch (e) {
                         setLookMsg(e instanceof Error ? e.message : String(e));
                       } finally {
@@ -737,22 +742,15 @@ function Wizard() {
                       }
                     }}
                   >
-                    {subscribed ? "Subscribed" : busy === "sub" ? "Subscribing…" : "Subscribe to their list"}
+                    {busy === "sub" ? "Subscribing…" : `Allow ${hostOf(theirList)} and subscribe`}
                   </Button>
                 </div>
               </div>
             ) : (
-              <div class="stack">
-                <p class="muted">
-                  If they publish one and link it from their bio, subscribing means you see what they disown without waiting to work it
-                  out yourself. Most artists don't have one yet; the community list you already subscribe to covers some of the gap.
-                </p>
-                <div class="row">
-                  <Button disabled={busy === "look"} onClick={() => void lookForTheirList()}>
-                    {busy === "look" ? "Looking…" : "Look for their list"}
-                  </Button>
-                </div>
-              </div>
+              <p class="muted">
+                They do not link one from their bio yet. Every check looks again, and subscribes for you if one appears, so there is
+                nothing here to come back and do. Meanwhile the community list you already subscribe to covers some of the gap.
+              </p>
             )}
             {lookMsg && <div class="notice">{lookMsg}</div>}
           </div>

@@ -282,6 +282,8 @@ export type Message =
   | { type: "run:now"; profileKey?: string }
   | { type: "profile:add"; url: string; watchOnly?: boolean }
   | { type: "profile:watchOnly"; profileKey: string; watchOnly: boolean }
+  /** Read a bio the caller already has for a list the artist publishes, and subscribe if it checks out. */
+  | { type: "list:fromBio"; profileKey: string; bio?: string }
   | { type: "profile:remove"; profileKey: string }
   | {
       type: "alert:resolve";
