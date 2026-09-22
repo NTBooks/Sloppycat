@@ -1,6 +1,6 @@
 // Service worker: alarms, run loop, hidden-tab rendering, offscreen parsing, list refresh, messaging.
 import type { Alert, ExtractResult, ListChange, Message, Platform, Profile, RunState, SnapshotItem } from "./types";
-import { profileKey as keyOf, itemKey, MAX_RUN_LOG } from "./types";
+import { profileKey as keyOf, itemKey, isRunning, MAX_RUN_LOG } from "./types";
 import * as storage from "./storage";
 import { adapterFor, detectProfile, type FetchContext } from "./adapters";
 import { diffSnapshots } from "./diff";
@@ -67,9 +67,36 @@ storage.onChange(["settings"], () => void scheduleAlarms());
  */
 async function log(text: string, bad = false): Promise<void> {
   const at = new Date().toISOString();
-  await storage.update("runState", (cur) =>
-    cur && !cur.endedAt ? { ...cur, beatAt: at, log: [...cur.log, { at, text, bad }].slice(-MAX_RUN_LOG) } : cur,
-  );
+  await storage.update("runState", (cur) => {
+    // Lazily open one rather than dropping the line. Work started from the wizard is not a run, and
+    // a page load nobody narrates is a page load the user closes.
+    const base = cur && !cur.endedAt ? cur : { startedAt: at, queue: [], done: 0, log: [] };
+    return { ...base, beatAt: at, log: [...base.log, { at, text, bad }].slice(-MAX_RUN_LOG) };
+  });
+}
+
+/**
+ * Narrate a piece of work that is not a scheduled run: a snapshot from the wizard, a claim check.
+ * These open the same background window and take just as long, so they get the same commentary.
+ */
+async function activity<T>(phase: string, fn: () => Promise<T>): Promise<T> {
+  const ours = !isRunning(await storage.get("runState"));
+  if (ours) {
+    const at = new Date().toISOString();
+    await storage.set("runState", { startedAt: at, beatAt: at, queue: [], done: 0, log: [], phase });
+    await log(phase);
+  }
+  try {
+    return await fn();
+  } catch (e) {
+    if (ours) await log(e instanceof Error ? e.message : String(e), true);
+    throw e;
+  } finally {
+    if (ours) {
+      await setRun(null);
+      await closeHidden();
+    }
+  }
 }
 
 // ---------- hidden-tab rendering ----------
@@ -150,6 +177,7 @@ async function getHiddenTab(): Promise<{ windowId: number; tabId: number }> {
       hidden = undefined;
     }
   }
+  await log("Opening a minimized background window to read pages in");
   const w = await chrome.windows.create({ url: "about:blank", state: "minimized", focused: false, type: "popup" });
   const tabId = w.tabs?.[0]?.id;
   if (w.id === undefined || tabId === undefined) throw new Error("Could not open a background window to read the page in");
@@ -271,6 +299,7 @@ async function pageThroughCatalog(caps: SpotifyCapture[], have: number): Promise
 export async function extractFromTab(tabId: number, platform: Platform, profileId: string): Promise<ExtractResult> {
   if (platform === "spotify" && !profileId.includes(":")) {
     // Structured data first; the DOM is virtualized and only a fallback.
+    await log("Waiting for Spotify to hand over the catalogue (up to 12s)");
     const caps = (await waitForSpotifyCaptures(tabId, profileId, 12000)) as SpotifyCapture[];
     const now = new Date().toISOString();
     let parsed = parseSpotifyCaptures(caps, profileId, now);
@@ -279,6 +308,7 @@ export async function extractFromTab(tabId: number, platform: Platform, profileI
       const total = counts["all"] ?? (counts["albums"] ?? 0) + (counts["singles"] ?? 0) + (counts["compilations"] ?? 0);
       const own = parsed.items.filter((i) => i.kind !== "appears_on").length;
       if (total > own) {
+        await log(`Spotify says ${total} releases and sent ${own}; paging through the rest`);
         const extra = await pageThroughCatalog(caps, own);
         if (extra.length) parsed = parseSpotifyCaptures([...caps, ...extra], profileId, now);
       }
@@ -287,6 +317,7 @@ export async function extractFromTab(tabId: number, platform: Platform, profileI
       return parsed;
     }
   }
+  await log("Reading the page contents");
   await chrome.scripting.executeScript({ target: { tabId }, files: ["content/extract.js"] });
   const res = (await chrome.tabs.sendMessage(tabId, { type: "extract:run", platform, profileId })) as
     | { ok: true; result: ExtractResult }
@@ -317,8 +348,8 @@ function render(url: string, platform: Platform, profileId: string): Promise<Ext
       await log(`Loading ${short(url)}`);
       await chrome.tabs.update(tabId, { url, active: false });
       await waitForLoad(tabId, 20000);
+      await log("Page loaded, letting it settle");
       await new Promise((r) => setTimeout(r, 1500));
-      await log(`Reading the page`);
       return await extractFromTab(tabId, platform, profileId);
     } catch (e) {
       // There is deliberately no retry here. Reopening a window the user just closed is what made
@@ -580,6 +611,7 @@ export async function ingestSnapshot(profile: Profile, result: ExtractResult, do
     // Search the most recent few titles; that is where clones cluster.
     for (const w of watched.slice(0, 3)) {
       try {
+        await log(`Searching ${adapter.label} for copies of "${w.title}"`);
         const found = await adapter.searchLookalikes(w.title, c);
         for (const cand of found) {
           if (items.some((i) => i.itemId === cand.itemId)) continue;
@@ -808,13 +840,16 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         const p = (await storage.get("profiles"))[m.profileKey];
         if (!p) return { ok: false, error: "Unknown profile" };
         const adapter = adapterFor(p.platform);
+        return activity(`Looking for your list link on ${adapter.label}`, async () => {
         const result = await adapter.fetchSnapshot(p.profileId, ctx(), { withBio: true });
         const v = await verifyProfile(p, result.bio);
         await storage.update("profiles", (all) => ({
           ...all,
           [m.profileKey]: { ...all[m.profileKey]!, verified: v.ok, verifiedListUrl: v.ok ? v.listUrl : undefined },
         }));
+        await log(v.ok ? "Your bio links to your list and the list names this profile" : (v.reason ?? "Not verified"), !v.ok);
         return { ok: v.ok, reason: v.reason, listUrl: v.listUrl };
+        });
       }
       case "snapshot:fromTab": {
         // Wizard path: extract from the tab the creator is looking at.
@@ -823,16 +858,24 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         const det = detectProfile(tab.url ?? "");
         if (!det) return { ok: false, error: "This tab is not a supported profile page" };
         const adapter = adapterFor(det.platform);
-        // JSON platforms are more complete via their API than via the page.
-        let result: ExtractResult;
-        if (adapter.strategy === "json" || det.platform === "amazon") {
-          // JSON APIs are complete; Amazon's full list is on the allbooks page, not the page the creator is on.
-          result = await adapter.fetchSnapshot(det.profileId, ctx(), { withBio: true });
-        } else {
-          result = await extractFromTab(m.tabId, det.platform, det.profileId);
-          if (!result.items.length) result = await adapter.fetchSnapshot(det.profileId, ctx(), { withBio: true });
-        }
-        return { ok: true, detected: det, result };
+        return activity(`Reading your ${adapter.label} profile`, async () => {
+          // JSON platforms are more complete via their API than via the page.
+          let result: ExtractResult;
+          if (adapter.strategy === "json" || det.platform === "amazon") {
+            // JSON APIs are complete; Amazon's full list is on the allbooks page, not the page the creator is on.
+            await log(`Asking ${adapter.label} for the full catalogue`);
+            result = await adapter.fetchSnapshot(det.profileId, ctx(), { withBio: true });
+          } else {
+            await log("Reading the tab you have open");
+            result = await extractFromTab(m.tabId, det.platform, det.profileId);
+            if (!result.items.length) {
+              await log("Nothing on that tab yet, opening the profile in the background instead");
+              result = await adapter.fetchSnapshot(det.profileId, ctx(), { withBio: true });
+            }
+          }
+          await log(`Found ${result.items.length} release${result.items.length === 1 ? "" : "s"}`);
+          return { ok: true, detected: det, result };
+        });
       }
       case "scan:collect": {
         const m = msg as Extract<Message, { type: "scan:collect" }>;

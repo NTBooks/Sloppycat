@@ -102,15 +102,39 @@ export function RunPanel(props: {
     end.current?.scrollIntoView({ block: "nearest" });
   }, [run.log.length]);
   if (!run.running && !run.log.length) return null;
+  // Work started from the wizard has no queue to count, so the bar runs indeterminate rather than
+  // claiming a progress it cannot know.
+  const counted = run.total > 0;
+  const pct = counted ? Math.round((run.done / run.total) * 100) : 0;
+  const headline = !run.running
+    ? "Last check"
+    : counted
+      ? `Step ${Math.min(run.done + 1, run.total)} of ${run.total}`
+      : (run.phase ?? "Working");
   return (
     <div class={`notice run-panel${run.running ? " is-running" : ""}`}>
       <div class="run-head">
         <strong>
-          {run.running ? `Checking ${Math.min(run.done + 1, run.total)} of ${run.total}` : "Last check"}
-          {run.label ? `: ${run.label}` : ""}
+          {headline}
+          {counted && run.label ? `: ${run.label}` : ""}
         </strong>
         {run.running && <span class="run-dot" aria-hidden="true" />}
       </div>
+      {run.running && (
+        <div
+          class={`run-bar${counted ? "" : " indeterminate"}`}
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={counted ? 100 : undefined}
+          aria-valuenow={counted ? pct : undefined}
+          aria-label={headline}
+        >
+          <span style={counted ? `width:${pct}%` : undefined} />
+        </div>
+      )}
+      {run.running && run.log.length > 0 && (
+        <div class="run-now">{run.log[run.log.length - 1]!.text}</div>
+      )}
       {run.running && (
         <div class="muted run-warn">
           Spotify and Amazon can only be read in a real page, so a minimized Sloppycat window is open while this

@@ -1,8 +1,8 @@
 // Onboarding wizard: Snapshot → Review → Generate → Publish → Claim → Watch.
 import { render } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { Button, Chip, CopyButton, Empty, SignalChips } from "../shared/components";
-import { useStorage } from "../shared/hooks";
+import { Button, Chip, CopyButton, Empty, RunPanel, SignalChips } from "../shared/components";
+import { useRun, useStorage } from "../shared/hooks";
 import { download, send } from "../shared/rpc";
 import type { ExtractResult, ItemKind, Platform, Profile, SnapshotItem } from "../../types";
 import { PLATFORM_LABEL } from "../../types";
@@ -54,6 +54,7 @@ function Wizard() {
   const params = new URLSearchParams(location.search);
   const initialTabId = params.get("tabId") ? Number(params.get("tabId")) : undefined;
   const [step, setStep] = useState<Step>(0);
+  const run = useRun();
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [tabs, setTabs] = useState<chrome.tabs.Tab[]>([]);
@@ -189,6 +190,7 @@ function Wizard() {
       </div>
       <Steps step={step} />
       {error && <div class="notice bad">{error}</div>}
+      <RunPanel run={run} />
 
       {step === 0 && (
         <div class="stack">
