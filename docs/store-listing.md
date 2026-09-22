@@ -53,7 +53,9 @@ Those blocker features are experimental, switched off until you turn them on, an
 
 HOW A LIST IS TRUSTED
 
-Anyone can write a file claiming your catalog. So the proof is not in the file. You paste your list's address into a bio only you can edit, in Spotify for Artists or Amazon Author Central, and the list names that profile back. Both directions have to match, and only you can do the second half. Every copy of the extension checks that for itself before it shows a mark, and an unproven claim shows nothing at all.
+Anyone can write a file claiming your catalog, so no file proves itself. Mine does not either. Nothing gets marked on a page unless you added the list that says so, the same way you add filter lists to an ad blocker. Every mark names the list it came from, and dropping that list drops everything it ever said.
+
+Artists who want to go further can point a bio only they control, in Spotify for Artists or Amazon Author Central, at their list. When that link is there your own browser checks it against the platform, and the card tells you it did. It is optional, and nothing breaks if an artist takes it back out.
 
 PRIVACY
 

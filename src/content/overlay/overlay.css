@@ -177,6 +177,15 @@
   font-size: 11px;
   color: #626b73;
 }
+.sloppycat-card .sc-via {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #626b73;
+}
+.sloppycat-card .sc-via-self-checked,
+.sloppycat-card .sc-via-attested {
+  color: #7fbf7f;
+}
 .sloppycat-card .sc-link {
   color: #ff7a1a;
   text-decoration: none;

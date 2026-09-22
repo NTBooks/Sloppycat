@@ -5,7 +5,7 @@ import * as storage from "../storage";
 import type { CachedList } from "../storage";
 import { expiresToMs, parseList } from "./format";
 import { normalizeListUrl } from "../adapters/shared";
-import { attestations, claimsThisProfile, trustFor, type Trust } from "./claims";
+import { attestations, claimsThisProfile, isCorroborated, routeFor, type ListRoute } from "./claims";
 
 export const DEFAULT_COMMUNITY_LIST = "https://raw.githubusercontent.com/NTBooks/Sloppycat/main/lists/community.md";
 
@@ -145,14 +145,14 @@ export async function lookup(
   const ownSource = settings.myListUrl ?? "local";
   if (myList) all.unshift({ source: ownSource, doc: myList, fetchedAt: new Date().toISOString() });
 
-  // A list only speaks for a platform once its claim over a profile there has been proved.
+  // Every enabled list speaks: the user put it there. The route only records how, so the card can
+  // say whether anybody checked the claim against the platform.
   const attested = attestations(all);
-  const trust = new Map<string, Trust>();
-  const lists = all.filter((l) => {
-    const t = trustFor(l, platform, claims, attested, l.source === ownSource && !!myList);
-    trust.set(l.source, t);
-    return t.trusted;
-  });
+  const routes = new Map<string, ListRoute>();
+  const lists = all;
+  for (const l of all) {
+    routes.set(l.source, routeFor(l, platform, claims, attested, l.source === ownSource && !!myList));
+  }
 
   const out: Record<string, Verdict> = {};
   const idSet = new Set(ids);
@@ -178,11 +178,8 @@ export async function lookup(
     }
     return undefined;
   };
-  const via = (l: CachedList) => trust.get(l.source);
-  const viaOf = (l: CachedList): Verdict["via"] => {
-    const t = trust.get(l.source);
-    return t && t.via !== "none" ? t.via : undefined;
-  };
+  const via = (l: CachedList) => routes.get(l.source);
+  const viaOf = (l: CachedList): Verdict["via"] => routes.get(l.source)?.via;
 
   const rank = (v: Verdict, isCreator: boolean) => (v.status === "not_mine" ? 2 : 1) + (isCreator ? 0.5 : 0);
 
@@ -251,8 +248,9 @@ export async function lookup(
 }
 
 /**
- * Creator lists that claim this profile but have not proved it yet. The caller checks them against the
- * platform; until one passes, nothing from those lists is shown.
+ * Creator lists that claim this profile and have nothing corroborating it yet. The caller may check
+ * them against the platform's bio to upgrade the route. Their rows render either way; a check that
+ * passes only changes the card from "a list you added" to "checked against the artist's profile".
  */
 export async function unprovenClaims(platform: Platform, profileUrl: string): Promise<string[]> {
   const cache = await storage.get("listCache");
@@ -266,7 +264,7 @@ export async function unprovenClaims(platform: Platform, profileUrl: string): Pr
       (l) =>
         l.doc.type === "creator" &&
         claimsThisProfile(l.doc, platform, profileUrl) &&
-        !trustFor(l, platform, claims, attested, false).trusted,
+        !isCorroborated(routeFor(l, platform, claims, attested, false).via),
     )
     .map((l) => l.source);
 }

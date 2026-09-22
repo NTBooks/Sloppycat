@@ -1,18 +1,23 @@
-// Who is allowed to speak for a profile.
+// Who gets to speak for a profile.
 //
-// A list saying "this is the catalog of artist X" is a claim, and a claim is worthless on its own:
-// anyone can write a file naming anyone's profile. The claim only becomes trustworthy when the profile
-// itself points back at the list, through a bio that only the account holder can edit (Spotify for
-// Artists, Amazon Author Central, a claimed Goodreads profile).
+// A list saying "this is artist X's catalog, and that release isn't theirs" is a claim, and no file
+// proves itself: anyone can write one naming anyone's profile. So the extension doesn't try to work
+// out which files are honest. You do, by adding a list, the same way you add a filter list to an ad
+// blocker. Nothing arrives on its own, and dropping a list drops everything it ever said.
 //
-// Every copy of the extension checks that for itself, against the platform, before it will render a
-// verdict from that list. There is no server to lie to: tampering with your own client only changes
-// what your own browser shows you.
+// A creator can corroborate their list by pointing a bio only they control at it (Spotify for
+// Artists, Amazon Author Central, a claimed Goodreads profile). When that holds, the viewer's own
+// browser can confirm it against the platform and the card says so. That is a label on a list you
+// already chose, never a gate. Proof can't be a precondition when it depends on a creator leaving a
+// link in their profile forever, and a system that goes dark the day somebody rewrites their bio for
+// a tour announcement is a system nobody can rely on.
 //
-// Checking costs a page load, so there are two routes to a trusted list:
-//   1. you added the creator's list yourself, and your client verifies the bio link (cached 30 days);
-//   2. a community list you subscribed to attests the claim, because its curators checked it.
-// Anything else renders nothing at all.
+// So `via` records how a list came to be speaking on this page. Every route renders:
+//   own-list      your own decisions about your own catalog
+//   self-checked  this browser read the creator's bio and it pointed back (cached 30 days)
+//   attested      a community list you subscribe to recorded that check, with evidence
+//   community     a community list you subscribe to, vouching for itself
+//   unproved      a creator list you added that nothing has corroborated yet
 
 import type { CachedList } from "../storage";
 import type { ListDocument, Platform } from "../types";
@@ -68,32 +73,38 @@ export function attestations(lists: CachedList[]): Map<string, { by: string; che
   return out;
 }
 
-export interface Trust {
-  trusted: boolean;
-  /** How it was established, for the report card and the settings table. */
-  via: "own-list" | "self-checked" | "attested" | "community" | "none";
+export type Route = "own-list" | "self-checked" | "attested" | "community" | "unproved";
+
+export interface ListRoute {
+  /** How this list came to be speaking here. Not whether it may: you added it, so it may. */
+  via: Route;
   attestedBy?: string;
 }
 
+/** Whether a route means somebody checked the claim against the platform. */
+export function isCorroborated(via: Route): boolean {
+  return via === "self-checked" || via === "attested";
+}
+
 /**
- * Decide whether a cached list may produce verdicts for a platform.
- * `ownList` is the user's own decisions, which need no proof to badge their own page.
+ * How a cached list came to be speaking for a platform.
+ * `ownList` is the user's own decisions, which need no corroboration to badge their own page.
  */
-export function trustFor(
+export function routeFor(
   list: CachedList,
   platform: Platform,
   claims: Record<string, Claim>,
   attested: Map<string, { by: string; checked?: string }>,
   isOwnList: boolean,
-): Trust {
-  if (isOwnList) return { trusted: true, via: "own-list" };
-  // Subscribing to a community list is itself the trust decision, the same as adding a filter list.
-  if (list.doc.type === "community") return { trusted: true, via: "community" };
+): ListRoute {
+  if (isOwnList) return { via: "own-list" };
+  // Subscribing is the trust decision, the same as adding a filter list.
+  if (list.doc.type === "community") return { via: "community" };
   const key = claimKey(list.source, platform);
-  if (claims[key]?.state === "verified") return { trusted: true, via: "self-checked" };
+  if (claims[key]?.state === "verified") return { via: "self-checked" };
   const att = attested.get(key);
-  if (att) return { trusted: true, via: "attested", attestedBy: att.by };
-  return { trusted: false, via: "none" };
+  if (att) return { via: "attested", attestedBy: att.by };
+  return { via: "unproved" };
 }
 
 /** Profiles a creator list claims on one platform, in the order they should be checked. */

@@ -17,6 +17,16 @@ export const STATUS_GLYPH: Record<Verdict["status"], string> = {
   likely_accurate: "◷︎",
 };
 
+// How the list came to be on this page. Proof is a label here, not a gate: every one of these
+// renders, and the difference between them is whether anybody checked the claim at the platform.
+export const VIA_TEXT: Record<NonNullable<Verdict["via"]>, string> = {
+  "own-list": "Your own list",
+  "self-checked": "Your browser checked this against the artist's profile",
+  attested: "Checked by a list you subscribe to",
+  community: "A list you subscribe to",
+  unproved: "A list you added. Nothing has checked it against the artist's profile.",
+};
+
 export function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
@@ -45,6 +55,7 @@ export function cardHtml(title: string, v: Verdict): string {
     }
     ${disc}
     <div class="sc-src">From list: <a class="sc-link" href="${esc(v.listUrl)}" target="_blank" rel="noreferrer">${esc(v.listTitle)}</a></div>
+    ${v.via ? `<div class="sc-via sc-via-${v.via}">${esc(v.via === "attested" && v.attestedBy ? `Checked by ${v.attestedBy}` : VIA_TEXT[v.via])}</div>` : ""}
   `;
 }
 

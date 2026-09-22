@@ -263,7 +263,7 @@ export interface Verdict {
   note?: string;
   released?: string;
   baselineBefore?: string;
-  /** How this list earned the right to speak for the profile. */
-  via?: "own-list" | "self-checked" | "attested" | "community";
+  /** How this list came to be speaking for the profile. You added it; this says by which route. */
+  via?: "own-list" | "self-checked" | "attested" | "community" | "unproved";
   attestedBy?: string;
 }

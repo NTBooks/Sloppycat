@@ -149,9 +149,14 @@ with the file already filled in.
 **Publish it** anywhere with a plain URL. A public Gist is the least work. The raw URL is what people
 subscribe to.
 
-**Then prove it's you.** Paste that URL into a bio only you can edit: Spotify for Artists, Amazon Author
-Central, or a claimed Goodreads profile. The extension reads your bio, follows the link, and checks the list
-names that same profile back. Both directions have to match. No account, no signup, nothing to trust me with.
+**Optionally, prove it's you.** Paste that URL into a bio only you can edit: Spotify for Artists, Amazon
+Author Central, or a claimed Goodreads profile. The extension reads your bio, follows the link, and checks
+the list names that same profile back, and subscribers' cards say so. No account, no signup, nothing to trust
+me with.
+
+This is a label, not a requirement. Your list works without it, and it keeps working if you take the link
+back out. Nobody should have to treat a line of their bio as permanent infrastructure, and two of the five
+platforms give you nowhere to put one anyway. [How the trust works](docs/trust.md) goes through why.
 
 The `disclosure` column is yours to use or ignore. If you used AI for the cover and not the words, say so and
 it shows up on the hover card. Music keys are `vocals`, `instruments`, `postproduction`, `art`, `lyrics`.
@@ -159,7 +164,7 @@ Book keys are `text`, `images`, `cover`, `translation`. Values are `human`, `ai-
 Anything else you write still displays.
 
 **Labels, managers and lawyers:** one list can cover a whole roster. Put every artist's profile in the
-Creator table, publish once, and have each artist's bio point at it. You already hold this data, it's what your
+Creator table and publish once. You already hold this data, it's what your
 DDEX or ONIX feed says. Nobody publishes it anywhere a browser can read, which is the only reason this scam
 works as well as it does.
 
