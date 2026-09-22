@@ -584,9 +584,10 @@ export async function ingestSnapshot(profile: Profile, result: ExtractResult, do
         for (const cand of found) {
           if (items.some((i) => i.itemId === cand.itemId)) continue;
           if (alreadyAlerted.has(itemKey(cand))) continue;
-          const sig = lookalikeSignal(cand, [w]);
+          // The artist's own records come back in their own search results, often under a second
+          // id for another market, so the creator is passed in and their own catalogue is skipped.
+          const sig = lookalikeSignal(cand, [w], { name: profile.displayName ?? result.displayName, id: profile.profileId });
           if (!sig) continue;
-          // Skip if the platform attributes it to the same creator string and it's already on the profile.
           alreadyAlerted.add(itemKey(cand));
           newAlerts.push({
             id: crypto.randomUUID(),

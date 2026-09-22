@@ -24,6 +24,26 @@ function spotifyKind(typeText: string): ItemKind {
   return "album";
 }
 
+/**
+ * The artwork URL for a card. Spotify lazy-loads its grid images, so `src` is often empty or a
+ * placeholder while the real address sits in `srcset`. An empty box next to every alert is what
+ * this avoids.
+ */
+function bestImage(card: Element): string | undefined {
+  const img = card.querySelector("img");
+  if (!img) return undefined;
+  const srcset = img.getAttribute("srcset") ?? "";
+  // "url 64w, url 128w, ..." - take the last, which is the largest.
+  const fromSet = srcset
+    .split(",")
+    .map((part) => part.trim().split(/\s+/)[0])
+    .filter((u): u is string => !!u && !u.startsWith("data:"))
+    .pop();
+  const src = img.getAttribute("src") ?? undefined;
+  const usable = fromSet ?? (src && !src.startsWith("data:") ? src : undefined);
+  return usable;
+}
+
 export const extractSpotify: Extractor = (doc, url, profileId, now) => {
   const items: SnapshotItem[] = [];
   const seen = new Set<string>();
@@ -69,16 +89,22 @@ export const extractSpotify: Extractor = (doc, url, profileId, now) => {
     const kindFirst = /(Album|Single|EP|Compilation)\s*[•·]\s*(\d{4})/i.exec(metaText);
     const yearFirst = /(\d{4})\s*[•·]\s*(Album|Single|EP|Compilation)/i.exec(metaText);
     const year = kindFirst ? [kindFirst[0], kindFirst[2], kindFirst[1]] : yearFirst;
-    const img = card.querySelector("img");
+    // Who it is by. On a search grid this is the difference between "someone cloned your title"
+    // and "this is your own record", so it is worth digging for.
+    const artistLink = card.querySelector<HTMLAnchorElement>('a[href*="/artist/"]');
+    const artistId = /\/artist\/([A-Za-z0-9]{22})/.exec(artistLink?.getAttribute("href") ?? "")?.[1];
+    const artistName = textOf(artistLink) || undefined;
     seen.add(m[1]!);
     items.push({
       platform: "spotify",
       itemId: m[1]!,
       title,
+      subtitle: artistName,
       kind: year ? spotifyKind(year[2]!) : "unknown",
       releaseDate: year?.[1],
       url: `https://open.spotify.com/album/${m[1]}`,
-      imageUrl: img?.getAttribute("src") ?? undefined,
+      imageUrl: bestImage(card),
+      meta: artistId ? { artistId } : undefined,
       firstSeen: now,
       source: "profile",
     });

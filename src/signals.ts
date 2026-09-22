@@ -46,8 +46,40 @@ export function signalsFor(item: SnapshotItem, history: SnapshotItem[]): Signal[
   return out;
 }
 
-/** For search results: which watched item does this candidate resemble? */
-export function lookalikeSignal(candidate: SnapshotItem, watched: SnapshotItem[]): Signal | null {
+/** Loose name match, for deciding whether two rows are by the same person. */
+export function sameCreator(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false;
+  const norm = (x: string) =>
+    x
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/&/g, "and")
+      .replace(/^(the|a|an)\s+/, "")
+      .replace(/[^a-z0-9]+/g, "");
+  const na = norm(a);
+  const nb = norm(b);
+  return !!na && na === nb;
+}
+
+/**
+ * For search results: which watched item does this candidate resemble?
+ *
+ * @param creator the watched profile's own name and id. A record by the same artist is not a
+ *   lookalike of itself, and the same album routinely appears in search under a second id for a
+ *   different market or remaster, so matching on the item id alone lets an artist's own catalogue
+ *   come back as a 100% match against itself.
+ */
+export function lookalikeSignal(
+  candidate: SnapshotItem,
+  watched: SnapshotItem[],
+  creator?: { name?: string; id?: string },
+): Signal | null {
+  if (creator) {
+    const candidateArtistId = (candidate.meta as { artistId?: string } | undefined)?.artistId;
+    if (creator.id && candidateArtistId && candidateArtistId === creator.id) return null;
+    if (sameCreator(candidate.subtitle, creator.name)) return null;
+  }
   let best: { title: string; score: number } | null = null;
   for (const w of watched) {
     if (w.itemId === candidate.itemId) return null; // it's the real thing
