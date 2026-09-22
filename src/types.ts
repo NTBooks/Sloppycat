@@ -185,6 +185,8 @@ export interface Settings {
   intervalMinutes: number; // >= 15
   lookalikeEveryNRuns: number;
   notifications: boolean;
+  /** Also notify when a list you subscribe to starts (or stops) asserting something. */
+  listUpdates: boolean;
   defaultDisclosure: Disclosure;
   experiments: Experiments;
   /** Where the creator's own list lives once published (raw URL). */
@@ -199,6 +201,7 @@ export const DEFAULT_SETTINGS: Settings = {
   intervalMinutes: 60,
   lookalikeEveryNRuns: 6,
   notifications: true,
+  listUpdates: true,
   defaultDisclosure: {},
   experiments: DEFAULT_EXPERIMENTS,
 };
@@ -228,7 +231,7 @@ export type Message =
   | { type: "verify:profile"; profileKey: string }
   | { type: "claims:check"; listUrl: string; platform: Platform }
   | { type: "scan:collect"; tabId: number }
-  | { type: "dev:simulate"; kind: "new" | "lookalike" | "drift"; profileKey?: string }
+  | { type: "dev:simulate"; kind: "new" | "lookalike" | "drift" | "listupdate"; profileKey?: string }
   | { type: "snapshot:fromTab"; tabId: number }
   | { type: "open:onboard"; platform?: Platform; profileId?: string }
   | { type: "extract:run"; platform: Platform; profileId: string };
@@ -266,4 +269,27 @@ export interface Verdict {
   /** How this list came to be speaking for the profile. You added it; this says by which route. */
   via?: "own-list" | "self-checked" | "attested" | "community" | "unproved";
   attestedBy?: string;
+}
+
+/**
+ * One thing a subscribed list started, or stopped, saying since the last time it was fetched.
+ * The changelog these build up is the only way to notice a list that has gone bad, and the only
+ * way a listener hears that an artist confirmed something new without opening the page.
+ */
+export interface ListChange {
+  id: string;
+  at: string; // ISO datetime of the fetch that saw it
+  source: string; // list URL
+  listTitle: string;
+  listType: "creator" | "community";
+  /** verified: appeared in Mine. flagged: appeared in Not mine. retracted: left Not mine. */
+  kind: "verified" | "flagged" | "retracted";
+  platform: Platform;
+  itemId: string;
+  title: string;
+  /** The creator profile this list names for that platform, when it names one. */
+  creatorProfile?: string;
+  disclosure?: Disclosure;
+  note?: string;
+  seen: boolean;
 }

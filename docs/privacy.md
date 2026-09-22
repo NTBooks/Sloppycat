@@ -48,7 +48,9 @@ cached on your computer.
 
 - **storage** — keeps your watched profiles, snapshots, decisions and settings on your computer.
 - **alarms** — schedules the periodic check. Without it, checks would stop when the browser worker sleeps.
-- **notifications** — tells you when something new appears on a profile you watch.
+- **notifications** — tells you when something new appears on a profile you watch, and, if you leave that
+  on, when a list you subscribed to starts or stops saying something. Both are local: the check that
+  produces them runs in your browser, and nothing about them is reported anywhere.
 - **tabs** and **scripting** — reads the public catalog from a platform page, and marks items on pages when
   you have turned that on. Used only on the sites listed below.
 - **offscreen** — parses saved HTML from a platform page. Chrome's extension worker cannot parse HTML on its

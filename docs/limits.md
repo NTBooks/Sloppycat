@@ -72,7 +72,9 @@ review and takedown letters all work on someone else's page, you just can't prov
 watching that verification correctly fail is itself worth doing.
 
 Settings has a **Testing** panel that plants a new release, a lookalike or a hidden-count warning on a watched
-profile, so the whole path from alert to letter can be walked in about a minute. Nothing is sent anywhere and
+profile, so the whole path from alert to letter can be walked in about a minute. It also plants a list update,
+which is the blocker-side equivalent: the notification and the changelog entry you would get when a list you
+subscribe to confirms or flags something, without waiting for the next refresh. Nothing is sent anywhere and
 nothing on the platform changes; the planted items live only in that browser.
 
 For the security property that matters most, publish a list claiming a profile you don't control, subscribe to

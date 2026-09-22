@@ -12,7 +12,7 @@ const STUB = `
 <script>
 // Minimal chrome.* stub with seeded data, for rendering checks only.
 const store = {
-  settings: { mode: "both", intervalMinutes: 60, lookalikeEveryNRuns: 6, notifications: true, defaultDisclosure: { text: "human" }, myListUrl: "https://gist.githubusercontent.com/jane/abc/raw" },
+  settings: { mode: "both", intervalMinutes: 60, lookalikeEveryNRuns: 6, notifications: true, listUpdates: true, defaultDisclosure: { text: "human" }, myListUrl: "https://gist.githubusercontent.com/jane/abc/raw" },
   profiles: {
     "spotify:3yY2gUcIsjMr8hjo51PoJ8": { platform: "spotify", profileId: "3yY2gUcIsjMr8hjo51PoJ8", url: "https://open.spotify.com/artist/3yY2gUcIsjMr8hjo51PoJ8", displayName: "The Smiths", addedAt: "2026-09-20T10:00:00Z", lastRunAt: "2026-09-22T12:00:00Z", verified: true },
     "amazon:www.amazon.com|B001IGFHW6": { platform: "amazon", profileId: "www.amazon.com|B001IGFHW6", url: "https://www.amazon.com/stores/author/B001IGFHW6", displayName: "Jane Doe", addedAt: "2026-09-20T10:00:00Z", lastRunAt: "2026-09-22T12:00:00Z", lastError: "Bot challenge at https://www.amazon.com/stores/author/B001IGFHW6/allbooks" }
@@ -27,6 +27,11 @@ const store = {
     { url: "https://example.com/broken.md", enabled: false, title: undefined, error: "line 12: Unknown platform \\"kindle\\"" }
   ],
   listCache: {},
+  listChanges: [
+    { id: "c1", at: "2026-09-22T12:00:00Z", source: "https://gist.githubusercontent.com/thesmiths/abc/raw", listTitle: "The Smiths — verified catalog", listType: "creator", kind: "verified", platform: "spotify", itemId: "06Ey2y54V4aGjP5EsovA2O", title: "Rank", creatorProfile: "https://open.spotify.com/artist/3yY2gUcIsjMr8hjo51PoJ8", disclosure: { vocals: "human", instruments: "human" }, seen: false },
+    { id: "c2", at: "2026-09-22T12:00:00Z", source: "https://gist.githubusercontent.com/thesmiths/abc/raw", listTitle: "The Smiths — verified catalog", listType: "creator", kind: "flagged", platform: "spotify", itemId: "9xYcdefghijklmnopqrstu", title: "Midnight Jazz Vibes", creatorProfile: "https://open.spotify.com/artist/3yY2gUcIsjMr8hjo51PoJ8", note: "uploaded through 8412 Records DK, reported 22 Sep", seen: false },
+    { id: "c3", at: "2026-09-19T08:00:00Z", source: "https://raw.githubusercontent.com/sloppycat/lists/main/community.md", listTitle: "Sloppycat community list", listType: "community", kind: "retracted", platform: "amazon", itemId: "B0FAKE0001", title: "The Long Field: Summary & Analysis", seen: true }
+  ],
   myList: { title: "The Smiths — verified catalog", type: "creator", version: "2026-09-22", expires: "7 days", creator: [{ platform: "spotify", profile: "https://open.spotify.com/artist/3yY2gUcIsjMr8hjo51PoJ8" }], mine: [{ platform: "spotify", id: "06Ey2y54V4aGjP5EsovA2O", title: "Rank", disclosure: { vocals: "human", instruments: "human" } }], notMine: [{ platform: "spotify", id: "9xYcdefghijklmnopqrstu", title: "Midnight Jazz Vibes", firstSeen: "2026-09-14", note: "via 8412 Records DK" }] },
   runCounter: 3
 };

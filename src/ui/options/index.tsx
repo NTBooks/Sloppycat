@@ -131,6 +131,16 @@ function General() {
           <label>Notifications</label>
           <input type="checkbox" class="toggle" checked={settings.notifications} onChange={(e) => void setSettings({ ...settings, notifications: (e.target as HTMLInputElement).checked })} />
         </div>
+        <div>
+          <label title="One notification per refresh, however many rows changed.">Tell me about list updates</label>
+          <input
+            type="checkbox"
+            class="toggle"
+            checked={settings.listUpdates}
+            disabled={!settings.notifications || settings.mode === "creator"}
+            onChange={(e) => void setSettings({ ...settings, listUpdates: (e.target as HTMLInputElement).checked })}
+          />
+        </div>
       </div>
       <div>
         <label>Default disclosure for new "mine" items (key:value; e.g. text:human; cover:ai-assisted)</label>
@@ -297,9 +307,10 @@ function Testing() {
   const [alerts] = useStorage("alerts");
   const [msg, setMsg] = useState("");
   const watched = Object.keys(profiles ?? {}).length;
-  const run = async (kind: "new" | "lookalike" | "drift") => {
+  const run = async (kind: "new" | "lookalike" | "drift" | "listupdate") => {
     const r = await send<{ ok: boolean; error?: string }>({ type: "dev:simulate", kind });
-    setMsg(r.ok ? "Planted. Open Alerts." : (r.error ?? "Failed"));
+    const where = kind === "listupdate" ? "Open List updates." : "Open Alerts.";
+    setMsg(r.ok ? `Planted. ${where}` : (r.error ?? "Failed"));
   };
   return (
     <section class="card stack">
@@ -328,6 +339,13 @@ function Testing() {
           </Button>
         </div>
       )}
+      <div class="row">
+        <Button onClick={() => void run("listupdate")}>Plant a list update</Button>
+      </div>
+      <p class="muted" style="margin:0;font-size:12px">
+        The blocker half: pretends a list you subscribe to confirmed a release, so you can see the notification
+        and the changelog without waiting for the next refresh.
+      </p>
       {msg && <div class="notice ok">{msg}</div>}
     </section>
   );
@@ -336,6 +354,8 @@ function Testing() {
 function Sources() {
   const [sources] = useStorage("listSources");
   const [cache] = useStorage("listCache");
+  const [changes] = useStorage("listChanges");
+  const unseen = (changes ?? []).filter((c) => !c.seen).length;
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const all = Object.values(cache ?? {}).map((c) => c.doc);
@@ -361,6 +381,9 @@ function Sources() {
           Add
         </Button>
         <Button onClick={() => void send({ type: "lists:refresh" })}>Refresh all</Button>
+        <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/changes/index.html") })}>
+          What changed{unseen ? ` (${unseen})` : ""}
+        </Button>
       </form>
       <table>
         <thead>

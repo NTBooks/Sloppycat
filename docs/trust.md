@@ -16,7 +16,7 @@ made the choice.
 | **EasyList** | Small maintainer team, public git repo, flat files at stable URLs. Anyone proposes a filter by issue or PR; maintainers merge; clients refetch on an expiry. | Yes, and it's the model: subscribe-by-URL, expiry, ETag, git history as the audit log. |
 | **AdGuard** | Same, plus a *filter registry*: a repo holding an index of lists with metadata, reviewed in the open before inclusion. | Yes. This is the "official file people send PRs to". |
 | **uBlock Origin** | Ships a curated set, lets you add any URL, and only honors its most powerful filter types from trusted lists, never from an arbitrary subscription. | Partly. The escape hatch transfers. The tiering doesn't, for the reason two sections down. |
-| **Adblock Plus** | A central Acceptable Ads whitelist, run by one company, which took payment for inclusion. | As a warning. A central list with a commercial incentive lost the room permanently. |
+| **Adblock Plus** | A central Acceptable Ads whitelist, run by one company, which took payment for inclusion. | As a warning. A central list that sold inclusion lost the room permanently. |
 
 Our rows are unlike a filter rule in one way that matters. A rule about `example.com/ads.js` is right or wrong
 on its own terms, and a bad one gets reverted. A row here is a claim of ownership, so a wrong one is an
@@ -100,6 +100,27 @@ it's per-row rather than all-or-nothing, and it doesn't depend on a platform con
 A community list revokes the same way. The one thing nobody can revoke is a copy somebody has deliberately
 pinned, which is true of every subscription system and isn't worth pretending otherwise.
 
+## How a subscriber hears about it
+
+If the file is the publication channel and the revocation channel, then the difference between two fetches is
+the news, and until now nobody was told it. Each refresh is diffed against the copy that was cached: rows that
+appeared in `Mine`, rows that appeared in `Not mine`, and rows that left `Not mine` go into a changelog, which
+is the **List updates** page. That is what lets an artist confirming a new release reach the people who
+subscribed to them, instead of only showing up the next time somebody happens to load the page.
+
+Three rules keep it honest and quiet:
+
+- The first fetch of a list is the baseline, not news. A list you just added has plenty to say and none of it
+  happened while you were watching.
+- One notification per refresh, whatever changed. A community list can add fifty rows at once, and fifty
+  toasts would teach people to turn the whole thing off.
+- Removing a list removes its history along with everything else it ever said, which is the same promise the
+  marks on the page make.
+
+A row moving from `Not mine` to `Mine` counts as one decision rather than two, since what happened is that the
+creator changed their mind about whose it was. It is on by default and switchable in Settings, and it is the
+one place the extension speaks without being asked, so I would rather it under-spoke.
+
 ## Can't a user just fake it with DevTools?
 
 Yes, and it doesn't matter. There is no server here that believes the client. If you open DevTools and mark a
@@ -128,10 +149,12 @@ the CDN.
 - **Discovery.** Subscription as the root only works if finding a good list is easy. Right now it isn't, and
   that's the weakest part of this design. It's the same problem EasyList solved with fifteen years of word of
   mouth, and I don't have a shortcut.
-- **A list that goes bad.** The sanction is unsubscribing, which requires noticing. A changelog view, so you
-  can see what a list started asserting since you added it, would help and doesn't exist yet.
+- **A list that goes bad.** The sanction is unsubscribing, which requires noticing. There is a changelog for
+  that now (see below), but it still puts the noticing on the reader, and a list that adds one bad row a
+  month is a slow enough drip that I doubt anyone catches it by eye.
 - **Registry capture.** The mitigations are that the rules are mechanical and public, the evidence is in the
   history, the default registry can be disabled in Settings like any other list, and forking it takes minutes.
-  There is nothing to sell, and there will be no paid inclusion, ever. That is the whole Eyeo lesson.
+  Nobody can pay to be on a list, or to be left off one, ever. That is the whole Eyeo lesson: what cost Eyeo
+  the room was selling inclusion itself, not being a business.
 - **Scale.** A registry with thousands of entries should ship as a generated JSON index next to the Markdown,
   so clients don't parse a huge file. Format stays the same; only the transport changes.

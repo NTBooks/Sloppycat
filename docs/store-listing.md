@@ -49,6 +49,8 @@ FOR EVERYONE ELSE
 
 Creators can publish what they confirmed as a plain Markdown list, anywhere with a URL. Other people subscribe to those lists the way you subscribe to filter lists in an ad blocker, and disowned items get marked on the page before you press play or buy a copy. Hovering a mark tells you who said what and when, including which parts of a record were made with AI if the artist said so.
 
+Those lists are re-fetched on a timer and each fetch is compared with the last, so you can be told what changed: a release the artist has just confirmed as theirs, a new fake they have flagged, or an accusation they have withdrawn. It is one notification per check rather than one per entry, the first fetch of a list you just added counts as a starting point rather than news, and removing a list takes its history with it.
+
 Those blocker features are experimental, switched off until you turn them on, and they only work in the web client.
 
 HOW A LIST IS TRUSTED
@@ -82,7 +84,9 @@ Paste each into the matching box. Keep them literal; a reviewer checks them agai
   Nothing leaves the browser.
 - **alarms** — Runs the periodic check on the user's chosen interval. Chrome terminates the extension worker
   between events, so timers are not an option.
-- **notifications** — Tells the user when a release they did not publish appears on a profile they watch.
+- **notifications** — Tells the user when a release they did not publish appears on a profile they watch, and
+  when a list they subscribed to adds or withdraws an entry. One notification per check, and both can be
+  turned off in Settings.
 - **tabs** — Detects when the user is on a supported profile page so the popup can offer to snapshot it, and
   opens the extension's own pages.
 - **scripting** — Reads the public catalog from a supported platform page, and marks items on those pages

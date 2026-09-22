@@ -37,7 +37,8 @@ that missing public projection, and for a label it is an export of something the
 is out, and so are the indies. That means governance has to be visible and boring: the format is open, anyone
 can publish a list without asking me, the community list's evidence bar is written down, no platform or label
 gets special treatment in the code, and a creator's own list always outranks anyone else's claim about them.
-There's nothing to sell here and no account to own, which is the main argument that it stays neutral.
+Nobody can pay to be on a list or to be left off one, and there is no account to own, which is the main
+argument that it stays neutral.
 
 **Positioning:** "The ad blocker for fake releases. Artists verify their catalog; fans see it." Not an AI detector; an artist-verified overlay. Secondary: "Find out in an hour, not a month."
 

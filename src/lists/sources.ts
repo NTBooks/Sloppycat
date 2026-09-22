@@ -1,11 +1,12 @@
 // List subscriptions: fetch, cache, expire, and answer lookups for the consumer overlay.
-import type { Identifiers, ListSource, Platform, Verdict } from "../types";
+import type { Identifiers, ListChange, ListSource, Platform, Verdict } from "../types";
 import { ID_KEYS } from "../types";
 import * as storage from "../storage";
 import type { CachedList } from "../storage";
 import { expiresToMs, parseList } from "./format";
 import { normalizeListUrl } from "../adapters/shared";
 import { attestations, claimsThisProfile, isCorroborated, routeFor, type ListRoute } from "./claims";
+import { forgetSource, recordChanges } from "./changes";
 
 export const DEFAULT_COMMUNITY_LIST = "https://raw.githubusercontent.com/NTBooks/Sloppycat/main/lists/community.md";
 
@@ -51,6 +52,8 @@ export async function addSource(url: string): Promise<ListSource> {
 
 export async function removeSource(url: string): Promise<void> {
   await storage.update("listSources", (s) => s.filter((x) => x.url !== url || x.builtin));
+  // Dropping a list drops everything it ever said, the changelog included.
+  await forgetSource(url);
   await storage.update("listCache", (c) => {
     const next = { ...c };
     delete next[url];
@@ -62,18 +65,22 @@ export async function setSourceEnabled(url: string, enabled: boolean): Promise<v
   await storage.update("listSources", (s) => s.map((x) => (x.url === url ? { ...x, enabled } : x)));
 }
 
-/** Fetch one source if stale (or forced). Records errors on the source row instead of throwing. */
-export async function refreshSource(url: string, force = false): Promise<void> {
+/**
+ * Fetch one source if stale (or forced). Records errors on the source row instead of throwing.
+ * Returns what changed since the last fetch, for the caller to notify about.
+ */
+export async function refreshSource(url: string, force = false): Promise<ListChange[]> {
   const sources = await storage.get("listSources");
   const src = sources.find((s) => s.url === url);
-  if (!src || !src.enabled) return;
+  if (!src || !src.enabled) return [];
   const cache = await storage.get("listCache");
   const cached = cache[url];
   if (!force && cached) {
     const ttl = expiresToMs(cached.doc.expires);
-    if (Date.now() - Date.parse(cached.fetchedAt) < ttl) return;
+    if (Date.now() - Date.parse(cached.fetchedAt) < ttl) return [];
   }
   const patch: Partial<ListSource> = {};
+  let changes: ListChange[] = [];
   try {
     const headers: Record<string, string> = {};
     if (cached?.etag) headers["If-None-Match"] = cached.etag;
@@ -96,6 +103,7 @@ export async function refreshSource(url: string, force = false): Promise<void> {
           fetchedAt: new Date().toISOString(),
           etag: res.headers.get("etag") ?? undefined,
         };
+        changes = await recordChanges(url, cached?.doc, parsed.doc, entry.fetchedAt);
         cache[url] = entry;
         patch.title = parsed.doc.title;
         patch.type = parsed.doc.type;
@@ -110,11 +118,14 @@ export async function refreshSource(url: string, force = false): Promise<void> {
   }
   await storage.set("listCache", cache);
   await storage.update("listSources", (s) => s.map((x) => (x.url === url ? { ...x, ...patch } : x)));
+  return changes;
 }
 
-export async function refreshAll(force = false): Promise<void> {
+export async function refreshAll(force = false): Promise<ListChange[]> {
   const sources = await storage.get("listSources");
-  for (const s of sources) if (s.enabled) await refreshSource(s.url, force);
+  const changes: ListChange[] = [];
+  for (const s of sources) if (s.enabled) changes.push(...(await refreshSource(s.url, force)));
+  return changes;
 }
 
 /**

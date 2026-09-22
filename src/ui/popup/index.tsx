@@ -10,6 +10,7 @@ function Popup() {
   const [settings, setSettings] = useStorage("settings");
   const [profiles] = useStorage("profiles");
   const [alerts] = useStorage("alerts");
+  const [changes] = useStorage("listChanges");
   const [tab, setTab] = useState<chrome.tabs.Tab | null>(null);
   const [detected, setDetected] = useState<{ platform: Platform; profileId: string; url: string } | null>(null);
 
@@ -21,6 +22,7 @@ function Popup() {
   }, []);
 
   const open = Object.values(alerts ?? {}).filter((a) => !a.resolution).length;
+  const unseen = (changes ?? []).filter((c) => !c.seen).length;
   const nProfiles = Object.keys(profiles ?? {}).length;
   const mode = settings?.mode ?? "both";
 
@@ -68,6 +70,10 @@ function Popup() {
           <strong style={open ? "color:var(--bad)" : ""}>{open}</strong>
         </div>
         <div class="stat">
+          <span>List updates</span>
+          <strong>{unseen}</strong>
+        </div>
+        <div class="stat">
           <span>Mode</span>
           <select
             value={mode}
@@ -82,6 +88,9 @@ function Popup() {
 
       <div class="row">
         <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/alert/index.html") })}>Alerts</Button>
+        <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/changes/index.html") })} title="What the lists you subscribe to changed">
+          Lists{unseen ? ` (${unseen})` : ""}
+        </Button>
         <Button onClick={() => void chrome.runtime.openOptionsPage()}>Settings</Button>
         <Button onClick={() => void send({ type: "run:now" })} disabled={!nProfiles} title="Check all watched profiles now">
           Check now

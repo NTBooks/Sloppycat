@@ -27,7 +27,7 @@ see the fakes flagged on the page before they press play or buy.
 - [Install it](#install-it) — pending store review, so you load it unpacked for now
 - [For artists and authors](#for-artists-and-authors) — snapshot, alerts, takedowns
 - [Make your own list](#make-your-own-list) — publish it, optionally prove it's you
-- [For slopblockers](#for-slopblockers) — subscribe, badges, uBlock export
+- [For slopblockers](#for-slopblockers) — subscribe, badges, list updates, uBlock export
 - [How it gets the data](#how-it-gets-the-data)
 - [What it won't do](#what-it-wont-do)
 - [How the trust works](docs/trust.md) and [the research behind it](research/)
@@ -195,6 +195,13 @@ hovering gives you the card.
 No badge at all means no list covers it. Silence, rather than a guess.
 
 Add sources in Settings. One community list ships enabled; any creator's Gist URL works.
+
+Lists are re-fetched every few hours, and each fetch is compared with the last one. What changed goes to
+**List updates**, reachable from the popup and from Settings: a release an artist has just confirmed as
+theirs, a new fake they have flagged, or an accusation they have withdrawn. You get one notification per
+refresh rather than one per row, the first fetch of a list you just added counts as the starting point rather
+than news, and removing a list takes its history with it. If you would rather not hear about it, the toggle
+is next to Notifications in Settings.
 
 <p align="center">
   <img src="docs/screenshots/05-settings.png" width="760" alt="Settings showing watched profiles, monitoring options, my list and the list sources table">

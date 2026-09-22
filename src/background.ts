@@ -1,11 +1,12 @@
 // Service worker: alarms, run loop, hidden-tab rendering, offscreen parsing, list refresh, messaging.
-import type { Alert, ExtractResult, Message, Platform, Profile, SnapshotItem } from "./types";
+import type { Alert, ExtractResult, ListChange, Message, Platform, Profile, SnapshotItem } from "./types";
 import { profileKey as keyOf, itemKey } from "./types";
 import * as storage from "./storage";
 import { adapterFor, detectProfile, type FetchContext } from "./adapters";
 import { diffSnapshots } from "./diff";
 import { signalsFor, lookalikeSignal } from "./signals";
 import { ensureDefaultSources, refreshAll, lookup, unprovenClaims } from "./lists/sources";
+import { MAX_CHANGES, summarize } from "./lists/changes";
 import { verifyProfile, runClaimCheck } from "./lists/verify";
 import { getClaim, isFresh } from "./lists/claims";
 import { mergeCreatorDoc } from "./lists/format";
@@ -45,8 +46,14 @@ chrome.runtime.onStartup.addListener(async () => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_RUN) void runAll();
-  if (alarm.name === ALARM_LISTS) void refreshAll();
+  if (alarm.name === ALARM_LISTS) void refreshLists();
 });
+
+/** Scheduled list refresh: unlike the one Settings triggers, this one is worth telling you about. */
+async function refreshLists(): Promise<void> {
+  const changes = await refreshAll();
+  await notifyListChanges(changes);
+}
 
 storage.onChange(["settings"], () => void scheduleAlarms());
 
@@ -399,7 +406,32 @@ async function notify(profile: Profile, alerts: Alert[]): Promise<void> {
   });
 }
 
+/**
+ * One notification per refresh, not one per row: a community list can add fifty things at once, and
+ * fifty toasts would teach people to turn the whole thing off.
+ */
+async function notifyListChanges(changes: ListChange[]): Promise<void> {
+  if (!changes.length) return;
+  const settings = await storage.get("settings");
+  if (!settings.notifications || !settings.listUpdates) return;
+  // A creator-only install subscribes to lists to check its own claims, not to follow other people.
+  if (settings.mode === "creator") return;
+  const { title, message } = summarize(changes);
+  await chrome.notifications.create(`lists:${changes[0]!.id}`, {
+    type: "basic",
+    iconUrl: chrome.runtime.getURL("icons/icon-128.png"),
+    title,
+    message,
+    priority: 1,
+  });
+}
+
 chrome.notifications.onClicked.addListener((id) => {
+  if (id.startsWith("lists:")) {
+    const changeId = id.slice(6);
+    void chrome.tabs.create({ url: chrome.runtime.getURL(`ui/changes/index.html${changeId ? `#${changeId}` : ""}`) });
+    return;
+  }
   const alertId = id.startsWith("alert:") ? id.slice(6) : "";
   void chrome.tabs.create({ url: chrome.runtime.getURL(`ui/alert/index.html${alertId ? `#${alertId}` : ""}`) });
 });
@@ -603,6 +635,29 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         // Testing aid: plant something on a watched profile so the whole alert path can be exercised
         // without waiting for a real hijack, or owning a catalogue for one to happen to.
         const m = msg as Extract<Message, { type: "dev:simulate" }>;
+
+        if (m.kind === "listupdate") {
+          // The consumer half of the same aid: a subscribed list saying something new, without
+          // waiting six hours for a refresh or asking an artist to edit their file for you.
+          const sources = await storage.get("listSources");
+          const src = sources.find((s) => s.enabled);
+          const change: ListChange = {
+            id: crypto.randomUUID(),
+            at: new Date().toISOString(),
+            source: src?.url ?? "local:test",
+            listTitle: src?.title ?? "A list you subscribe to",
+            listType: src?.type ?? "community",
+            kind: "verified",
+            platform: "spotify",
+            itemId: `test${Math.random().toString(36).slice(2, 8)}`,
+            title: "Midnight Jazz Vibes (test) — confirmed by the creator",
+            seen: false,
+          };
+          await storage.update("listChanges", (cur) => [change, ...cur].slice(0, MAX_CHANGES));
+          await notifyListChanges([change]);
+          return { ok: true };
+        }
+
         const profiles = await storage.get("profiles");
         const profile = m.profileKey ? profiles[m.profileKey] : Object.values(profiles)[0];
         if (!profile) return { ok: false, error: "Watch a profile first, then simulate against it." };
