@@ -1,3 +1,4 @@
+import type preact from "preact";
 import { render } from "preact";
 import { useState } from "preact/hooks";
 import { Button, Chip, CopyButton, Empty } from "../shared/components";
@@ -145,6 +146,59 @@ function General() {
       <div class="muted" style="font-size:12px">
         Checks run only while Chrome is open. Alarms are re-created when Chrome starts.
       </div>
+    </section>
+  );
+}
+
+function Experimental() {
+  const [settings, setSettings] = useStorage("settings");
+  if (!settings) return null;
+  const x = settings.experiments;
+  const set = (patch: Partial<typeof x>) => void setSettings({ ...settings, experiments: { ...x, ...patch } });
+  const Row = (props: { on: boolean; onChange: (v: boolean) => void; title: string; children: preact.ComponentChildren }) => (
+    <div class="row" style="align-items:flex-start;gap:12px">
+      <input
+        type="checkbox"
+        class="toggle"
+        checked={props.on}
+        style="margin-top:3px"
+        onChange={(e) => props.onChange((e.target as HTMLInputElement).checked)}
+      />
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600">{props.title}</div>
+        <div class="muted" style="font-size:12px">
+          {props.children}
+        </div>
+      </div>
+    </div>
+  );
+  return (
+    <section class="card stack">
+      <div class="row">
+        <h2 style="margin:0">Slopblocker</h2>
+        <Chip tone="warn">Experimental</Chip>
+      </div>
+      <p class="muted" style="margin:0">
+        These change what platform pages look like, so they only work in the web client: not the Spotify desktop
+        app, not phones, not the Kindle app. They are off until you turn them on, and they only ever act on lists
+        you subscribed to.
+      </p>
+      <Row on={x.blocker} onChange={(v) => set({ blocker: v, blockFlagged: v ? x.blockFlagged : false })} title="Badge items on platform pages">
+        Puts a mark on albums and books your lists know about, on Spotify, Apple Music, Amazon author pages and
+        Goodreads. Hover it for who said what.
+      </Row>
+      <Row on={x.blockFlagged} onChange={(v) => set({ blockFlagged: v, blocker: v ? true : x.blocker })} title="Hide items the artist disowned">
+        Collapses those rows behind a line you can click to open, instead of only outlining them. Only applies to
+        items a verified creator says are not theirs, never to a guess.
+      </Row>
+      <Row on={x.slopscan} onChange={(v) => set({ slopscan: v })} title="Slopscan">
+        Check a library or shelf page you have open against your lists, and list what came back.
+      </Row>
+      {x.slopscan && (
+        <div class="row">
+          <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/scan/index.html") })}>Open Slopscan</Button>
+        </div>
+      )}
     </section>
   );
 }
@@ -327,6 +381,7 @@ function Options() {
       </div>
       <Profiles />
       <General />
+      <Experimental />
       <MyList />
       <Sources />
     </div>

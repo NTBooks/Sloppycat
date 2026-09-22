@@ -40,6 +40,48 @@
   border-radius: 4px;
 }
 
+/* With the blocking experiment on, a disowned item collapses behind a stub the reader can open. */
+.sloppycat-hidden {
+  display: none !important;
+}
+.sloppycat-stub {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 4px 0;
+  padding: 8px 11px;
+  border: 1px dashed rgba(255, 90, 81, 0.55);
+  border-radius: 6px;
+  background: rgba(255, 90, 81, 0.06);
+  color: #d8dee3;
+  font: 12px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.sloppycat-stub .sc-x {
+  color: #ff5a51;
+  font: 700 12px/1 ui-monospace, Menlo, monospace;
+  flex: none;
+}
+.sloppycat-stub .sc-msg {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sloppycat-stub .sc-show {
+  font: 600 11px/1 system-ui, sans-serif;
+  color: #e9edf0;
+  background: #23282c;
+  border: 1px solid #333a40;
+  border-radius: 4px;
+  padding: 6px 9px;
+  cursor: pointer;
+  flex: none;
+}
+.sloppycat-stub .sc-show:hover {
+  border-color: #ff7a1a;
+}
+
 .sloppycat-card {
   position: absolute;
   z-index: 2147483646;

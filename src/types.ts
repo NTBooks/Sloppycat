@@ -161,12 +161,29 @@ export interface ListSource {
   claims?: { platform: Platform; state: "verified" | "failed" | "unchecked"; via?: string; reason?: string }[];
 }
 
+/**
+ * Blocker-side features are experimental and off until the user turns them on. They all depend on
+ * reading and changing platform pages in the browser, so they only work in the web client: not the
+ * Spotify desktop app, not mobile, not the Kindle app.
+ */
+export interface Experiments {
+  /** Badge items on platform pages from subscribed lists. */
+  blocker: boolean;
+  /** Collapse items a creator says are not theirs, instead of only outlining them. */
+  blockFlagged: boolean;
+  /** Scan an open library or shelf page for items on your lists. */
+  slopscan: boolean;
+}
+
+export const DEFAULT_EXPERIMENTS: Experiments = { blocker: false, blockFlagged: false, slopscan: false };
+
 export interface Settings {
   mode: "creator" | "consumer" | "both";
   intervalMinutes: number; // >= 15
   lookalikeEveryNRuns: number;
   notifications: boolean;
   defaultDisclosure: Disclosure;
+  experiments: Experiments;
   /** Where the creator's own list lives once published (raw URL). */
   myListUrl?: string;
   /** GitHub device-flow token, if the user signed in. */
@@ -180,6 +197,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lookalikeEveryNRuns: 6,
   notifications: true,
   defaultDisclosure: {},
+  experiments: DEFAULT_EXPERIMENTS,
 };
 
 export function profileKey(p: { platform: Platform; profileId: string }): string {
@@ -206,6 +224,7 @@ export type Message =
   | { type: "lists:lookup"; platform: Platform; ids: string[] }
   | { type: "verify:profile"; profileKey: string }
   | { type: "claims:check"; listUrl: string; platform: Platform }
+  | { type: "scan:collect"; tabId: number }
   | { type: "snapshot:fromTab"; tabId: number }
   | { type: "open:onboard"; platform?: Platform; profileId?: string }
   | { type: "extract:run"; platform: Platform; profileId: string };

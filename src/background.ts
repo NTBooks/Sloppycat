@@ -480,6 +480,46 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         }
         return { ok: true, detected: det, result };
       }
+      case "scan:collect": {
+        const m = msg as Extract<Message, { type: "scan:collect" }>;
+        const [res] = await chrome.scripting.executeScript({
+          target: { tabId: m.tabId },
+          // Runs in the page: scrolls so virtualized lists mount, then hands back every link it saw.
+          // Ids are parsed on the extension side with the real adapters, so nothing is duplicated here.
+          func: async () => {
+            const seen = new Map<string, string>();
+            const harvest = () => {
+              for (const a of document.querySelectorAll<HTMLAnchorElement>("a[href]")) {
+                if (!seen.has(a.href)) {
+                  seen.set(
+                    a.href,
+                    (a.textContent ?? "").replace(/\s+/g, " ").trim() ||
+                      a.getAttribute("aria-label") ||
+                      a.getAttribute("title") ||
+                      a.querySelector("img")?.getAttribute("alt") ||
+                      "",
+                  );
+                }
+              }
+            };
+            const scroller =
+              document.querySelector<HTMLElement>("[data-overlayscrollbars-viewport]") ??
+              (document.scrollingElement as HTMLElement);
+            harvest();
+            const startTop = scroller.scrollTop;
+            for (let i = 0; i < 60; i++) {
+              const before = scroller.scrollTop;
+              scroller.scrollTop += Math.max(300, scroller.clientHeight * 0.85);
+              await new Promise((r) => setTimeout(r, 220));
+              harvest();
+              if (scroller.scrollTop === before) break;
+            }
+            scroller.scrollTop = startTop;
+            return [...seen].map(([href, text]) => ({ href, text }));
+          },
+        });
+        return { ok: true, links: (res?.result as { href: string; text: string }[]) ?? [] };
+      }
       case "open:onboard": {
         const m = msg as Extract<Message, { type: "open:onboard" }>;
         const q = m.platform && m.profileId ? `?platform=${m.platform}&profileId=${encodeURIComponent(m.profileId)}` : "";

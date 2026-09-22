@@ -7,13 +7,32 @@ import { expiresToMs, parseList } from "./format";
 import { normalizeListUrl } from "../adapters/shared";
 import { attestations, claimsThisProfile, trustFor, type Trust } from "./claims";
 
-export const DEFAULT_COMMUNITY_LIST = "https://raw.githubusercontent.com/sloppycat/lists/main/community.md";
+export const DEFAULT_COMMUNITY_LIST = "https://raw.githubusercontent.com/NTBooks/Sloppycat/main/lists/community.md";
+
+/** Earlier default URLs, replaced in place so an installed copy follows the move. */
+const RETIRED_DEFAULTS = ["https://raw.githubusercontent.com/sloppycat/lists/main/community.md"];
 
 export async function ensureDefaultSources(): Promise<void> {
   const sources = await storage.get("listSources");
-  if (!sources.some((s) => s.builtin)) {
+  const builtin = sources.find((s) => s.builtin);
+  if (!builtin) {
     sources.unshift({ url: DEFAULT_COMMUNITY_LIST, enabled: true, builtin: true, title: "Sloppycat community list" });
     await storage.set("listSources", sources);
+    return;
+  }
+  if (builtin.url !== DEFAULT_COMMUNITY_LIST && RETIRED_DEFAULTS.includes(builtin.url)) {
+    const old = builtin.url;
+    builtin.url = DEFAULT_COMMUNITY_LIST;
+    builtin.error = undefined;
+    builtin.etag = undefined;
+    builtin.fetchedAt = undefined;
+    await storage.set("listSources", sources);
+    await storage.update("listCache", (c) => {
+      const next = { ...c };
+      delete next[old];
+      return next;
+    });
+    await refreshSource(DEFAULT_COMMUNITY_LIST, true);
   }
 }
 

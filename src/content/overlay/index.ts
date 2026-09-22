@@ -14,7 +14,8 @@ let cardFor: HTMLElement | null = null;
 const processed = new Map<HTMLAnchorElement, string>();
 const verdictCache = new Map<string, Verdict | null>();
 let scanTimer: number | undefined;
-let enabled = true;
+let enabled = false;
+let blockFlagged = false;
 
 function ensureCard(): HTMLElement {
   if (card) return card;
@@ -118,7 +119,7 @@ async function scan() {
       const t = titleOf(a);
       if (!t) continue; // image-only links: skip, the text link will carry the badge
       a.appendChild(badgeFor(v, t));
-      if (v.status === "not_mine") a.closest("[data-asin], li, tr, article, [role='row']")?.classList.add("sloppycat-flagged");
+      if (v.status === "not_mine") flag(a, v, t);
     }
   }
 }
@@ -128,11 +129,48 @@ function scheduleScan() {
   scanTimer = window.setTimeout(() => void scan(), 400);
 }
 
+/** The container a platform uses for one item in a list or grid. */
+function rowFor(a: HTMLAnchorElement): HTMLElement | null {
+  return a.closest<HTMLElement>(
+    "[data-asin], [class*='ProductGridItem__itemOuter'], tr[itemtype], tr, li, article, [role='row'], [data-testid='tracklist-row']",
+  );
+}
+
+/**
+ * Mark an item the creator disowned. With the blockFlagged experiment on, the row is collapsed behind a
+ * stub the reader can open, which is the ad-blocker behaviour; otherwise it is just outlined.
+ */
+function flag(a: HTMLAnchorElement, v: Verdict, title: string): void {
+  const row = rowFor(a);
+  if (!row) return;
+  row.classList.add("sloppycat-flagged");
+  if (!blockFlagged || row.dataset["sloppycatBlocked"]) return;
+  row.dataset["sloppycatBlocked"] = "1";
+  const stub = document.createElement("div");
+  stub.className = "sloppycat-stub";
+  stub.innerHTML =
+    '<span class="sc-x">\u2717</span><span class="sc-msg"></span>' +
+    '<button type="button" class="sc-show">Show anyway</button>';
+  stub.querySelector(".sc-msg")!.textContent = `${title} \u2014 the artist says this isn't theirs`;
+  stub.querySelector(".sc-show")!.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    row.classList.remove("sloppycat-hidden");
+    stub.remove();
+  });
+  row.classList.add("sloppycat-hidden");
+  row.parentElement?.insertBefore(stub, row);
+}
+
 /** A list changed: drop cached verdicts, remove badges, and process every anchor again. */
 function rebadgeAll() {
   verdictCache.clear();
   for (const b of document.querySelectorAll(".sloppycat-badge")) b.remove();
-  for (const f of document.querySelectorAll(".sloppycat-flagged")) f.classList.remove("sloppycat-flagged");
+  for (const f of document.querySelectorAll(".sloppycat-flagged")) {
+    f.classList.remove("sloppycat-flagged", "sloppycat-hidden");
+    delete (f as HTMLElement).dataset["sloppycatBlocked"];
+  }
+  for (const s of document.querySelectorAll(".sloppycat-stub")) s.remove();
   processed.clear();
   hideCard();
   scheduleScan();
@@ -140,16 +178,25 @@ function rebadgeAll() {
 
 async function init() {
   if (!platform) return;
-  const { settings } = (await chrome.storage.local.get("settings")) as { settings?: { mode?: string } };
-  enabled = settings?.mode !== "creator";
+  type S = { mode?: string; experiments?: { blocker?: boolean; blockFlagged?: boolean } };
+  const apply = (s: S | undefined) => {
+    // Badging is an experiment, off by default, and never runs in creator-only mode.
+    enabled = !!s?.experiments?.blocker && s?.mode !== "creator";
+    blockFlagged = enabled && !!s?.experiments?.blockFlagged;
+  };
+  const { settings } = (await chrome.storage.local.get("settings")) as { settings?: S };
+  apply(settings);
+  if (!enabled) return;
   chrome.storage.onChanged.addListener((ch, area) => {
     if (area !== "local") return;
     if (ch["settings"]) {
-      enabled = (ch["settings"].newValue as { mode?: string })?.mode !== "creator";
-      if (!enabled) {
+      const was = enabled;
+      apply(ch["settings"].newValue as S);
+      if (!enabled && was) {
         for (const b of document.querySelectorAll(".sloppycat-badge")) b.remove();
         hideCard();
       }
+      if (enabled) rebadgeAll();
     }
     if (ch["listCache"] || ch["myList"] || ch["listSources"]) rebadgeAll();
   });

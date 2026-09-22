@@ -86,8 +86,13 @@ function Popup() {
         <Button onClick={() => void send({ type: "run:now" })} disabled={!nProfiles} title="Check all watched profiles now">
           Check now
         </Button>
+        {settings?.experiments.slopscan && (
+          <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/scan/index.html") })}>Slopscan</Button>
+        )}
       </div>
-      <div class="muted" style="font-size:11px">Monitoring runs while Chrome is open.</div>
+      <div class="muted" style="font-size:11px">
+        Monitoring runs while Chrome is open. Blocker features are experimental and work in the web client only.
+      </div>
     </div>
   );
 }

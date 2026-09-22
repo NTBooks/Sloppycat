@@ -3,27 +3,24 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link
   rel="stylesheet"
-  href="https://fonts.googleapis.com/css2?family=Chivo:wght@700;900&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+  href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,400&family=IBM+Plex+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap"
 />
 <style>
-  /* One committed look: a dark instrument panel. Every colour is painted explicitly so the page
-     holds on either host ground. */
+  /* Set like a music monthly: ink ground, serif display, hairline rules, a margin column that
+     carries the facts. One boxed object on the page, and it is the product, because it is a device. */
   :root {
-    --ink: #0a0c0d;
-    --panel: #14181b;
-    --panel-hi: #1a1f22;
-    --line: #262c31;
-    --line-soft: #1e2427;
-    --fg: #e9edf0;
-    --muted: #949ea6;
-    --dim: #646d75;
-    --accent: #ff7a1a;
-    --accent-deep: #c25709;
-    --led-ok: #37d67a;
-    --led-bad: #ff5a51;
-    --led-info: #5aa9ff;
-    --display: "Chivo", "Helvetica Neue", Arial, sans-serif;
-    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --ink: #0e1013;
+    --ink-2: #14171b;
+    --paper: #edeae4;
+    --paper-dim: #a9a49b;
+    --rule: #2b2f35;
+    --rule-soft: #1e2227;
+    --amber: #e8973c;
+    --oxblood: #c2504a;
+    --sage: #8aa98a;
+    --slate: #7f93ad;
+    --display: "Fraunces", Georgia, "Times New Roman", serif;
+    --text: "Newsreader", Georgia, serif;
     --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
   }
 
@@ -33,22 +30,30 @@
 
   body {
     margin: 0;
-    background:
-      radial-gradient(900px 500px at 78% -10%, #1b2125 0%, transparent 62%),
-      linear-gradient(180deg, #0c0f11 0%, var(--ink) 40%);
-    color: var(--fg);
-    font: 16px/1.6 var(--sans);
+    background-color: var(--ink);
+    /* Grain, so the ground reads as a printed surface rather than a flat fill. */
+    background-image: radial-gradient(circle at 1px 1px, rgba(237, 234, 228, 0.028) 1px, transparent 0);
+    background-size: 3px 3px;
+    color: var(--paper);
+    font: 400 18px/1.68 var(--text);
     -webkit-font-smoothing: antialiased;
   }
 
-  .wrap {
-    max-width: 1080px;
+  .sheet {
+    max-width: 1180px;
     margin: 0 auto;
-    padding-inline: 20px;
+    padding-inline: 28px;
+  }
+  @media (max-width: 560px) {
+    .sheet {
+      padding-inline: 18px;
+    }
   }
 
   a {
-    color: var(--accent);
+    color: var(--amber);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
 
   h1,
@@ -56,295 +61,243 @@
   h3 {
     font-family: var(--display);
     font-weight: 900;
-    letter-spacing: -0.025em;
-    text-wrap: balance;
+    font-variation-settings: "SOFT" 0, "WONK" 1;
+    letter-spacing: -0.02em;
+    line-height: 1.02;
     margin: 0;
+    text-wrap: balance;
   }
 
-  .eyebrow {
-    font: 600 11px/1 var(--mono);
-    letter-spacing: 0.18em;
+  .label {
+    font: 600 10px/1 var(--mono);
+    letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: var(--dim);
+    color: var(--paper-dim);
   }
 
   /* ---------- masthead ---------- */
 
-  header.bar {
-    border-bottom: 1px solid var(--line);
-    background: rgba(10, 12, 13, 0.82);
-    backdrop-filter: blur(8px);
-    position: sticky;
-    top: env(safe-area-inset-top, 0px);
-    z-index: 30;
+  .masthead {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding-block: 22px 14px;
+    border-bottom: 1px solid var(--rule);
   }
-  .bar-in {
+  .masthead .mark {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding-block: 12px;
+    gap: 11px;
   }
-  .logo {
-    width: 30px;
-    height: 30px;
-    flex: none;
+  .masthead img {
+    width: 34px;
+    height: 34px;
   }
-  .wordmark {
+  .masthead .name {
     font-family: var(--display);
     font-weight: 900;
-    font-size: 18px;
-    letter-spacing: -0.03em;
+    font-size: 27px;
+    letter-spacing: -0.035em;
   }
-  .bar .spacer {
-    flex: 1;
+  .masthead .dateline {
+    font: 400 11px/1 var(--mono);
+    color: var(--paper-dim);
+    margin-left: auto;
+    text-align: right;
   }
-  .bar nav {
-    display: flex;
-    gap: 18px;
-    font-size: 13px;
-  }
-  .bar nav a {
-    color: var(--muted);
-    text-decoration: none;
-  }
-  .bar nav a:hover {
-    color: var(--fg);
-  }
-  @media (max-width: 640px) {
-    .bar nav {
+  @media (max-width: 720px) {
+    .masthead .dateline {
       display: none;
     }
   }
 
-  /* ---------- hero ---------- */
+  /* ---------- opening ---------- */
 
-  .hero {
+  .opening {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-    gap: 44px;
-    align-items: center;
-    padding-block: 64px 56px;
+    grid-template-columns: minmax(0, 1.03fr) minmax(0, 0.97fr);
+    gap: 52px;
+    align-items: start;
+    padding-block: 54px 40px;
+    border-bottom: 1px solid var(--rule);
   }
-  @media (max-width: 900px) {
-    .hero {
+  @media (max-width: 940px) {
+    .opening {
       grid-template-columns: 1fr;
-      gap: 32px;
-      padding-block: 40px 36px;
+      gap: 34px;
+      padding-block: 34px 30px;
     }
   }
 
-  .hero h1 {
-    font-size: clamp(38px, 6vw, 62px);
-    line-height: 0.96;
-    margin-block: 14px 18px;
+  .opening h1 {
+    font-size: clamp(42px, 5.6vw, 74px);
+    margin-block: 16px 20px;
   }
-  .hero h1 em {
-    font-style: normal;
-    color: var(--accent);
+  .opening h1 .quiet {
+    font-weight: 400;
+    font-style: italic;
+    font-variation-settings: "SOFT" 8, "WONK" 1;
   }
   .lede {
-    font-size: 17px;
-    color: var(--muted);
-    max-width: 46ch;
+    font-size: 20px;
+    line-height: 1.6;
+    max-width: 30em;
+    color: #d9d5ce;
   }
-  .lede strong {
-    color: var(--fg);
+  .lede b {
     font-weight: 500;
+    color: var(--paper);
   }
 
-  .cta {
+  .buttons {
     display: flex;
-    gap: 10px;
+    gap: 22px;
+    align-items: center;
     flex-wrap: wrap;
-    margin-top: 26px;
+    margin-top: 28px;
   }
-  .btn {
-    font: 600 14px/1 var(--sans);
-    padding: 13px 18px;
-    border-radius: 6px;
-    text-decoration: none;
-    border: 1px solid var(--line);
-    color: var(--fg);
-    background: linear-gradient(180deg, #23282c, #171b1e);
-  }
-  .btn:hover {
-    border-color: #39424a;
-  }
-  .btn.go {
-    background: linear-gradient(180deg, var(--accent), var(--accent-deep));
-    border-color: #8f4207;
-    color: #150e07;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.22);
-  }
-  .btn.go:hover {
-    filter: brightness(1.07);
-  }
-  .undercta {
-    margin-top: 12px;
-    font: 400 12px/1.5 var(--mono);
-    color: var(--dim);
-  }
-
-  /* ---------- the device: a mock artist page that gets hijacked ---------- */
-
-  .rig {
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: linear-gradient(180deg, var(--panel-hi), var(--panel));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      0 24px 60px rgba(0, 0, 0, 0.55);
-    overflow: hidden;
-  }
-  .rig-head {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 11px 14px;
-    border-bottom: 1px solid var(--line);
-    background: #10141600;
-  }
-  .rig-head .dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: #2c3339;
-  }
-  .rig-head .who {
-    margin-left: 4px;
+  .ghost,
+  .solid {
     font: 600 12px/1 var(--mono);
-    color: var(--dim);
-    letter-spacing: 0.04em;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-decoration: none;
   }
-  .rig-head .status {
-    margin-left: auto;
+  .solid {
+    background: var(--amber);
+    color: #1a1105;
+    padding: 14px 20px;
+    border-radius: 2px;
+  }
+  .solid:hover {
+    filter: brightness(1.08);
+  }
+  .ghost {
+    color: var(--paper);
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 5px;
+  }
+  .ghost:hover {
+    border-color: var(--amber);
+  }
+
+  /* ---------- the device ---------- */
+
+  .device {
+    border: 1px solid var(--rule);
+    background: linear-gradient(180deg, var(--ink-2), #101317);
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+  }
+  .device-top {
     display: flex;
     align-items: center;
-    gap: 7px;
-    font: 600 10px/1 var(--mono);
-    letter-spacing: 0.14em;
-    color: var(--dim);
+    gap: 8px;
+    padding: 10px 13px;
+    border-bottom: 1px solid var(--rule-soft);
+    font: 400 10px/1 var(--mono);
+    letter-spacing: 0.12em;
     text-transform: uppercase;
+    color: var(--paper-dim);
   }
-  .led {
-    width: 7px;
-    height: 7px;
+  .device-top .pip {
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    background: var(--led-ok);
-    box-shadow: 0 0 8px var(--led-ok);
+    background: var(--sage);
+    box-shadow: 0 0 7px var(--sage);
   }
-  .led.scan {
-    animation: blink 1.6s ease-in-out infinite;
+  .device-top .right {
+    margin-left: auto;
   }
-  @keyframes blink {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.25;
-    }
+  .device-body {
+    padding: 10px;
   }
 
-  .rig-body {
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    position: relative;
-  }
-
-  .trk {
+  .cut {
     display: grid;
-    grid-template-columns: 42px minmax(0, 1fr) auto;
+    grid-template-columns: 40px minmax(0, 1fr);
     gap: 12px;
     align-items: center;
-    padding: 8px 9px;
-    border-radius: 6px;
-    border: 1px solid transparent;
+    padding: 8px;
   }
-  .trk .art {
-    width: 42px;
-    height: 42px;
-    border-radius: 3px;
-    background: linear-gradient(135deg, #343b41, #1d2225);
-    border: 1px solid #2b3238;
+  .cut .sleeve {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(140deg, #2f353b, #1b1f23);
+    border: 1px solid #2a3035;
   }
-  .trk .nm {
+  .cut .t {
+    font-family: var(--display);
     font-weight: 600;
-    font-size: 14px;
+    font-size: 15px;
+    letter-spacing: -0.01em;
     display: flex;
     align-items: center;
     gap: 8px;
     min-width: 0;
   }
-  .trk .nm span.t {
+  .cut .t span.n {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .trk .sub {
-    font: 400 11px/1.4 var(--mono);
-    color: var(--dim);
-    margin-top: 2px;
+  .cut .m {
+    font: 400 11px/1.5 var(--mono);
+    color: var(--paper-dim);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .badge {
+  .tag {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 17px;
-    height: 17px;
-    padding: 0 5px;
-    border-radius: 3px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
     font: 600 10px/1 var(--mono);
-    color: #0a0c0d;
+    color: #0e1013;
     flex: none;
   }
-  .badge.ok {
-    background: var(--led-ok);
+  .tag.yes {
+    background: var(--sage);
   }
-  .badge.bad {
-    background: var(--led-bad);
+  .tag.no {
+    background: var(--oxblood);
+    color: #f6ece9;
   }
-  .badge.old {
-    background: var(--led-info);
+  .tag.old {
+    background: var(--slate);
   }
-  .badge.unk {
-    background: #6d767d;
+  .tag.dunno {
+    background: #6f7781;
   }
 
-  /* the intruder row */
-  .trk.fake {
-    border-color: rgba(255, 90, 81, 0.5);
-    background: rgba(255, 90, 81, 0.05);
+  .cut.wrong {
+    background: rgba(194, 80, 74, 0.08);
+    box-shadow: inset 2px 0 0 var(--oxblood);
   }
-  .trk.landing {
-    animation: drop 620ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  .cut.arriving {
+    animation: settle 640ms cubic-bezier(0.2, 0.85, 0.3, 1) both;
   }
-  @keyframes drop {
+  @keyframes settle {
     from {
       opacity: 0;
-      transform: translateY(-14px);
+      transform: translateY(-12px);
     }
     to {
       opacity: 1;
       transform: none;
     }
   }
-  .trk.fake .badge.bad {
-    animation: pop 500ms ease-out 520ms both;
+  .cut.wrong .tag.no {
+    animation: ink 460ms ease-out 480ms both;
   }
-  @keyframes pop {
+  @keyframes ink {
     from {
-      transform: scale(0.4);
+      transform: scale(0.5);
       opacity: 0;
-    }
-    60% {
-      transform: scale(1.18);
     }
     to {
       transform: scale(1);
@@ -352,550 +305,516 @@
     }
   }
 
-  /* the report card */
-  .verdict {
-    margin: 4px 0 2px 54px;
-    border: 1px solid var(--line);
-    border-radius: 7px;
-    background: #0d1012;
+  .slip {
+    margin: 2px 8px 6px 60px;
+    border: 1px solid var(--rule);
+    background: #0b0d10;
     padding: 11px 12px;
     max-width: 330px;
-    animation: rise 420ms ease-out 900ms both;
+    animation: settle 420ms ease-out 880ms both;
   }
-  @keyframes rise {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-  .verdict .vh {
-    display: flex;
-    align-items: center;
-    gap: 7px;
+  .slip .hd {
     font: 600 10px/1 var(--mono);
-    letter-spacing: 0.1em;
+    letter-spacing: 0.11em;
     text-transform: uppercase;
-    color: var(--led-bad);
-    padding-bottom: 9px;
-    margin-bottom: 9px;
-    border-bottom: 1px solid var(--line-soft);
+    color: var(--oxblood);
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--rule-soft);
   }
-  .verdict p {
-    margin: 0 0 8px;
-    font-size: 13px;
-    color: #c6ced4;
+  .slip p {
+    margin: 0 0 7px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #cdc9c2;
   }
-  .verdict .src {
+  .slip .from {
     font: 400 11px/1.4 var(--mono);
-    color: var(--dim);
-  }
-  .verdict .src a {
-    color: var(--accent);
-    text-decoration: none;
+    color: var(--paper-dim);
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .trk.landing,
-    .trk.fake .badge.bad,
-    .verdict,
-    .led.scan {
+    .cut.arriving,
+    .cut.wrong .tag.no,
+    .slip {
       animation: none !important;
     }
   }
 
-  /* ---------- sections ---------- */
+  /* ---------- running text with a margin column ---------- */
 
-  section {
-    padding-block: 54px;
-    border-top: 1px solid var(--line-soft);
-  }
-  section h2 {
-    font-size: clamp(25px, 3.4vw, 34px);
-    margin-block: 10px 10px;
-  }
-  section .intro {
-    color: var(--muted);
-    max-width: 62ch;
-    margin: 0;
-  }
-
-  /* numbered because it genuinely is a sequence */
-  .chain {
+  .spread {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-    margin-top: 30px;
-    counter-reset: step;
+    grid-template-columns: minmax(0, 1fr) 230px;
+    gap: 46px;
+    padding-block: 46px;
+    border-bottom: 1px solid var(--rule);
+    align-items: start;
   }
-  @media (max-width: 820px) {
-    .chain {
+  .spread.flip {
+    grid-template-columns: 230px minmax(0, 1fr);
+  }
+  @media (max-width: 940px) {
+    .spread,
+    .spread.flip {
       grid-template-columns: 1fr;
+      gap: 26px;
+      padding-block: 32px;
     }
   }
-  .link {
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: linear-gradient(180deg, var(--panel-hi), var(--panel));
-    padding: 18px 16px 16px;
-    position: relative;
+
+  .spread h2 {
+    font-size: clamp(28px, 3.5vw, 40px);
+    margin-bottom: 18px;
   }
-  .link::before {
-    counter-increment: step;
-    content: counter(step, decimal-leading-zero);
-    font: 600 11px/1 var(--mono);
-    color: var(--accent);
-    letter-spacing: 0.1em;
+  .prose p {
+    margin: 0 0 16px;
+    max-width: 34em;
   }
-  .link h3 {
-    font-family: var(--display);
-    font-weight: 700;
-    font-size: 17px;
-    letter-spacing: -0.02em;
-    margin-block: 10px 7px;
+  .prose p:last-child {
+    margin-bottom: 0;
   }
-  .link p {
-    margin: 0;
-    font-size: 14px;
-    color: var(--muted);
+  .prose em {
+    font-style: italic;
+    color: #ddd9d2;
   }
 
-  .split {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
-    margin-top: 28px;
+  .margin {
+    font: 400 13px/1.62 var(--text);
+    color: var(--paper-dim);
+    border-top: 1px solid var(--rule);
+    padding-top: 12px;
   }
-  @media (max-width: 820px) {
-    .split {
-      grid-template-columns: 1fr;
-    }
-  }
-  .col {
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: linear-gradient(180deg, var(--panel-hi), var(--panel));
-    padding: 20px;
-  }
-  .col h3 {
-    font-family: var(--display);
-    font-weight: 900;
-    font-size: 20px;
-    margin-bottom: 4px;
-  }
-  .col .who {
+  .margin h4 {
     font: 600 10px/1 var(--mono);
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--dim);
+    color: var(--paper-dim);
+    margin: 0 0 10px;
   }
-  .col ul {
-    margin: 14px 0 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 11px;
+  .margin p {
+    margin: 0 0 12px;
   }
-  .col li {
-    display: grid;
-    grid-template-columns: 18px minmax(0, 1fr);
-    gap: 9px;
-    font-size: 14px;
-    color: var(--muted);
+  .margin p:last-child {
+    margin: 0;
   }
-  .col li b {
-    color: var(--fg);
-    font-weight: 600;
-  }
-  .tick {
-    font: 600 11px/1.5 var(--mono);
-    color: var(--accent);
+  .margin b {
+    color: var(--paper);
+    font-weight: 500;
+    font-family: var(--mono);
+    font-size: 12px;
   }
 
+  /* ---------- figures ---------- */
+
   figure {
-    margin: 26px 0 0;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--panel);
+    margin: 0;
   }
   figure img {
     display: block;
     width: 100%;
     height: auto;
+    border: 1px solid var(--rule);
   }
   figcaption {
-    padding: 10px 13px;
-    font: 400 12px/1.5 var(--mono);
-    color: var(--dim);
-    border-top: 1px solid var(--line-soft);
+    margin-top: 10px;
+    font: 400 12px/1.55 var(--mono);
+    color: var(--paper-dim);
+  }
+  figcaption b {
+    color: var(--paper);
+    font-weight: 600;
   }
 
-  .key {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 22px;
-  }
-  .key div {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 7px 13px 7px 8px;
-    font-size: 13px;
-    color: var(--muted);
-    background: #101315;
-  }
+  /* ---------- the document ---------- */
 
-  pre {
-    margin: 22px 0 0;
-    padding: 16px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: #08090a;
-    color: #c9d1d7;
-    font: 400 12.5px/1.65 var(--mono);
+  .doc {
+    border: 1px solid var(--rule);
+    background: #0a0c0e;
+    padding: 20px 22px;
     overflow-x: auto;
+    font: 400 13px/1.75 var(--mono);
+    color: #c4c9cf;
   }
-  pre b {
-    color: var(--accent);
-    font-weight: 400;
+  .doc .k {
+    color: var(--amber);
   }
-  pre i {
-    color: var(--led-ok);
-    font-style: normal;
+  .doc .yes {
+    color: var(--sage);
   }
-  pre s {
-    color: var(--led-bad);
-    text-decoration: none;
-  }
-
-  .note {
-    margin-top: 20px;
-    padding: 13px 15px;
-    border-left: 2px solid var(--accent);
-    background: #12161800;
-    color: var(--muted);
-    font-size: 14px;
+  .doc .no {
+    color: var(--oxblood);
   }
 
-  footer {
-    border-top: 1px solid var(--line);
-    padding-block: 30px 44px;
-    color: var(--dim);
-    font-size: 13px;
-  }
-  footer .row {
+  .keyline {
     display: flex;
-    gap: 16px;
     flex-wrap: wrap;
+    gap: 8px 22px;
+    margin: 20px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 15px;
+    color: var(--paper-dim);
+  }
+  .keyline li {
+    display: flex;
     align-items: center;
+    gap: 9px;
   }
-  footer a {
-    color: var(--muted);
-    text-decoration: none;
+
+  blockquote {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 400;
+    font-style: italic;
+    font-size: clamp(21px, 2.6vw, 27px);
+    line-height: 1.32;
+    color: var(--paper);
+    border-left: 2px solid var(--amber);
+    padding-left: 22px;
   }
-  footer a:hover {
-    color: var(--accent);
+
+  /* ---------- colophon ---------- */
+
+  .colophon {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 26px;
+    padding-block: 38px 56px;
+    font-size: 14px;
+    color: var(--paper-dim);
+  }
+  .colophon h4 {
+    font: 600 10px/1 var(--mono);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin: 0 0 10px;
+    color: var(--paper);
+  }
+  .colophon p {
+    margin: 0 0 8px;
+  }
+  .colophon a {
+    color: var(--paper-dim);
+  }
+  .colophon a:hover {
+    color: var(--amber);
   }
 
   :focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    outline: 2px solid var(--amber);
+    outline-offset: 3px;
   }
 </style>
 
-<header class="bar">
-  <div class="wrap bar-in">
-    <img class="logo" src="icon-128.png" alt="" />
-    <span class="wordmark">Sloppycat</span>
-    <span class="spacer"></span>
-    <nav>
-      <a href="#artists">For artists</a>
-      <a href="#blockers">For blockers</a>
-      <a href="#lists">Lists</a>
-      <a href="#industry">Labels</a>
-      <a href="#get">Install</a>
-    </nav>
-  </div>
-</header>
+<div class="sheet">
+  <header class="masthead">
+    <span class="mark">
+      <img src="icon-128.png" alt="" />
+      <span class="name">Sloppycat</span>
+    </span>
+    <span class="dateline">A Chrome extension<br />September 2026 · v0.1 · MIT</span>
+  </header>
 
-<main class="wrap">
-  <div class="hero">
+  <section class="opening">
     <div>
-      <p class="eyebrow">Chrome extension · free · no account</p>
-      <h1>There's a song on your artist page and you didn't make it.</h1>
+      <p class="label">For artists, authors, and anyone tired of it</p>
+      <h1>There's a song on your artist page <span class="quiet">and you didn't make it.</span></h1>
       <p class="lede">
         Here's how it gets there. Someone runs a track through an AI, signs up with a cheap distributor, and tells
         them it's yours. Nobody checks. It shows up on your profile next to your real records and the royalties go
         to them. Your fans think it's you. Same trick with books, except it's your name on a knockoff, or a title
-        one word off yours.
-        <strong>Sloppycat watches your profiles and tells you when something lands there that you didn't
-        put there.</strong>
+        one word off yours. <b>Sloppycat watches your profiles and tells you when something lands there that you
+        didn't put there.</b>
       </p>
-      <div class="cta">
-        <a class="btn go" href="#get">Install it</a>
-        <a class="btn" href="#artists">What it does</a>
+      <div class="buttons">
+        <a class="solid" href="#install">Install it</a>
+        <a class="ghost" href="#what">What it does</a>
       </div>
-      <p class="undercta">Spotify · Apple Music · Deezer · Amazon · Goodreads</p>
     </div>
 
-    <div class="rig" aria-label="Demonstration of a fake release appearing on an artist page">
-      <div class="rig-head">
-        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-        <span class="who">artist page</span>
-        <span class="status"><span class="led scan"></span> watching</span>
+    <div class="device" aria-label="A fake release appearing on an artist page and being flagged">
+      <div class="device-top">
+        <span class="pip"></span> artist page <span class="right">watching</span>
       </div>
-      <div class="rig-body" id="rig">
-        <div class="trk">
-          <div class="art"></div>
+      <div class="device-body" id="rig">
+        <div class="cut">
+          <div class="sleeve"></div>
           <div>
-            <div class="nm"><span class="t">The Queen Is Dead</span><span class="badge ok">✓</span></div>
-            <div class="sub">Album · 1986 · WM UK</div>
+            <div class="t"><span class="n">The Queen Is Dead</span><span class="tag yes">✓︎</span></div>
+            <div class="m">Album · 1986 · WM UK</div>
           </div>
         </div>
-        <div class="trk">
-          <div class="art"></div>
+        <div class="cut">
+          <div class="sleeve"></div>
           <div>
-            <div class="nm"><span class="t">Strangeways, Here We Come</span><span class="badge ok">✓</span></div>
-            <div class="sub">Album · 1987 · WM UK</div>
+            <div class="t"><span class="n">Strangeways, Here We Come</span><span class="tag yes">✓︎</span></div>
+            <div class="m">Album · 1987 · WM UK</div>
           </div>
         </div>
-        <div class="trk">
-          <div class="art"></div>
+        <div class="cut">
+          <div class="sleeve"></div>
           <div>
-            <div class="nm"><span class="t">Rank</span><span class="badge old">◷</span></div>
-            <div class="sub">Album · 1988 · WM UK</div>
+            <div class="t"><span class="n">Rank</span><span class="tag old">◷︎</span></div>
+            <div class="m">Album · 1988 · WM UK</div>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <section id="artists">
-    <p class="eyebrow">For artists and authors</p>
-    <h2>You tell it what's yours, once.</h2>
-    <p class="intro">
-      No detector knows your catalog. You do. So it asks you instead, one time, and then it watches the page for
-      you. Most weeks you won't hear from it, which is sort of the point.
-    </p>
-
-    <div class="chain">
-      <div class="link">
-        <h3>Snapshot your profile</h3>
-        <p>
-          Open your own artist or author page and press the button. It reads what's on there the same way anyone
-          else's browser would. Everything starts ticked as yours.
-        </p>
-      </div>
-      <div class="link">
-        <h3>Untick what isn't yours</h3>
-        <p>
-          Anything odd gets a note about what looked off, usually a label you've never heard of on something that
-          turned up last week. It's a reason to look. It isn't proof of anything.
-        </p>
-      </div>
-      <div class="link">
-        <h3>Send the takedown</h3>
-        <p>
-          Everything you untick comes with the letter already written, the right form for that platform, your
-          links and the release id filled in. You copy it and send it. That part still has to be you.
-        </p>
-      </div>
+  <section class="spread" id="what">
+    <div class="prose">
+      <h2>You tell it what's yours, once.</h2>
+      <p>
+        No detector knows your catalog. You do. So it asks you instead, one time, and then it watches the page for
+        you. Most weeks you won't hear from it, which is sort of the point.
+      </p>
+      <p>
+        Open your own artist or author page and press the button. It reads what's on there the same way anyone
+        else's browser would, and everything starts ticked as yours. You untick the things that aren't. Nothing
+        gets unticked for you, because a guess about your own catalog is worse than no guess at all.
+      </p>
+      <p>
+        Odd items get a note about what looked off, usually a label you've never heard of on something that turned
+        up last week. That's a reason to look. It isn't proof of anything, and plenty of honest releases have one.
+      </p>
     </div>
+    <aside class="margin">
+      <h4>What it reads</h4>
+      <p><b>Spotify</b> · <b>Apple Music</b> · <b>Deezer</b> · <b>Amazon</b> · <b>Goodreads</b></p>
+      <p>
+        Checks run hourly by default, and only while your browser is open. That's as far as an extension reaches.
+        Close it Friday night and it picks up Monday.
+      </p>
+    </aside>
+  </section>
 
+  <section class="spread">
     <figure>
       <img
         src="screenshot-review.png"
-        alt="The review screen listing albums, singles and compilations with tick boxes, and a suspicious single flagged with two warning chips"
+        alt="The review screen: albums, singles and compilations in a list with tick boxes, one single flagged with two warnings"
         width="1000"
         height="1310"
       />
-      <figcaption>Your catalog, grouped by type. The odd one gets flagged, but nothing gets unticked for you.</figcaption>
+      <figcaption><b>Fig. 1</b> — Your catalog, grouped. The single that arrived on a label you've never used is flagged, not unticked.</figcaption>
     </figure>
+    <aside class="margin">
+      <h4>The bit that matters</h4>
+      <p>
+        Everything you untick comes with the letter already written: the right form for that platform, your links
+        and the release id filled in, in the order the platform wants them.
+      </p>
+      <p>
+        Spotify takes the report plus your distributor, and it matters that you don't delete and re-upload your own
+        release while you wait. Amazon splits in two depending on whether the fake is on your page or just using
+        your name somewhere else.
+      </p>
+      <p>You copy it and send it. That part still has to be you.</p>
+    </aside>
+  </section>
 
-    <div class="note">
-      After that it checks on a timer, hourly unless you change it. Anything new you haven't claimed turns into an
-      alert with the takedown attached. It also goes looking for near-copies of your titles sitting somewhere else
-      under a made-up name, because watching your own page never catches those and that's half of what's going on.
+  <section class="spread flip">
+    <aside class="margin">
+      <h4>Reported cases</h4>
+      <p>
+        404 Media put a track onto a real band's profile to prove the hole existed. Jazz musicians have had
+        hundreds turn up. Jane Friedman found six books on Amazon with her name on them.
+      </p>
+      <p>
+        Deezer said AI tracks passed <b>50%</b> of daily uploads this July. The takedown, once an artist finally
+        reaches a human, took about <b>72 hours</b>.
+      </p>
+    </aside>
+    <div class="prose">
+      <h2>And if you just listen to music and read books?</h2>
+      <p>
+        Subscribe to an artist's list, or to the community one, the same way you subscribe to filter lists in an ad
+        blocker. Their stuff gets a small mark on the page, and hovering it tells you who said what and when.
+      </p>
+      <ul class="keyline">
+        <li><span class="tag yes">✓︎</span> the artist says it's theirs</li>
+        <li><span class="tag no">✗︎</span> the artist says it isn't</li>
+        <li><span class="tag old">◷︎</span> older than the slop wave</li>
+        <li><span class="tag dunno">○︎</span> enrolled, not yet confirmed</li>
+      </ul>
+      <p style="margin-top: 18px">
+        No mark means no list covers it yet. You get nothing instead of a guess, which I think is the right way
+        round. The blocker side is experimental and off until you turn it on, and it only works in the web player
+        and on the sites themselves, not the desktop app and not your phone.
+      </p>
     </div>
   </section>
 
-  <section id="blockers">
-    <p class="eyebrow">If you just listen to music and read books</p>
-    <h2>You get the fakes marked before you press play.</h2>
-    <p class="intro">
-      It works like the filter lists in your ad blocker. Subscribe to an artist's list, or to the community one, and
-      their stuff gets a badge on the page. Hover it and you get who said what, and when they said it.
-    </p>
-
-    <div class="key">
-      <div><span class="badge ok">✓</span> the artist says it's theirs</div>
-      <div><span class="badge bad">✗</span> the artist says it isn't</div>
-      <div><span class="badge old">◷</span> older than the slop wave, probably fine</div>
-      <div><span class="badge unk">○</span> enrolled artist, not yet confirmed</div>
-    </div>
-
+  <section class="spread">
     <figure>
       <img
         src="screenshot-card.png"
-        alt="A discography with a verified album badge and an open card showing vocals human, instruments human"
+        alt="A discography with a verified album marked, and a card open showing vocals human and instruments human"
         width="757"
         height="520"
       />
-      <figcaption>Hover a badge and you get what the artist said about it, and which list that came from.</figcaption>
+      <figcaption><b>Fig. 2</b> — The card on hover. If part of a record was made with AI and the artist said so, that shows up here too.</figcaption>
     </figure>
+    <aside class="margin">
+      <h4>Not a detector</h4>
+      <p>
+        Spotify and Deezer already badge AI-generated music, and it misses this entirely: a fake on your page is
+        credited to a human, so nothing flags it.
+      </p>
+      <p>The only person who knows whether a release is yours is you. So yours is the word the marks carry.</p>
+    </aside>
+  </section>
 
-    <div class="note">
-      No badge means no list covers it yet. You get nothing instead of a guess, which I think is the right way
-      round. And if something is yours and you did use AI on part of it, you can say which part and it shows up on
-      the card, instead of people arguing about it in your comments.
+  <section class="spread flip">
+    <aside class="margin">
+      <h4>Proving it's you</h4>
+      <p>
+        Paste the list's address into a bio only you can edit, in Spotify for Artists or Author Central, and have
+        the list name that profile back.
+      </p>
+      <p>
+        Anyone can write a list claiming your catalog. Nobody else can make your profile point at it. Every copy of
+        the extension checks that for itself before it shows a mark.
+      </p>
+    </aside>
+    <div class="prose">
+      <h2>Your list is a markdown file.</h2>
+      <p>
+        That's the whole format. One file, put anywhere that gives you an address, and a gist takes about a minute.
+        Anyone can read it without installing a thing, and if it's wrong they can send a pull request instead of
+        emailing me and waiting a week.
+      </p>
+      <div class="doc">
+        <span class="k"># Jane Doe verified catalog</span><br />
+        Type: creator<br />
+        <br />
+        <span class="k">## Creator</span><br />
+        | spotify | https://open.spotify.com/artist/0123456789abcdefghijkl |<br />
+        <br />
+        <span class="k">## Mine</span><br />
+        | spotify | 4aBcdefghijklmnopqrstu | Blue Room | <span class="yes">vocals:human</span>; art:ai-generated |<br />
+        <br />
+        <span class="k">## Not mine</span><br />
+        | spotify | 9xYcdefghijklmnopqrstu | <span class="no">Midnight Jazz Vibes</span> | 2026-09-14 | not ours |
+      </div>
     </div>
   </section>
 
-  <section id="lists">
-    <p class="eyebrow">The lists</p>
-    <h2>Your list is a markdown file.</h2>
-    <p class="intro">
-      That's the whole format. One file, put anywhere that gives you a URL, and a gist takes about a minute. Anyone
-      can read it without installing anything, and if it's wrong they can open a pull request instead of emailing me
-      and waiting a week.
-    </p>
+  <section class="spread">
+    <div class="prose">
+      <h2>One list can cover a whole roster.</h2>
+      <blockquote>
+        Like an ad blocker, this only does anything if the people who own the catalogs publish the lists.
+      </blockquote>
+      <p style="margin-top: 22px">
+        If you run a label, manage artists, or do this for a living as a lawyer: you already have this data. It's
+        what your DDEX feed tells the platforms, or your ONIX feed if you do books, down to the ISRCs and the
+        UPCs. What nobody publishes is a version of it a browser can check, which is a decent part of why this
+        works as well as it does.
+      </p>
+      <p>
+        Put every artist's profile in one list, publish it once, and have each artist's bio point at it. There's no
+        fee, no application and nothing to sign, because there's nobody in the middle and nothing here to sell.
+      </p>
+    </div>
+    <aside class="margin">
+      <h4>Neutral on purpose</h4>
+      <p>
+        The format is open, anyone can publish without asking me, and the evidence bar for the shared list is
+        written down in the repo.
+      </p>
+      <p>No paid inclusion, ever. That mistake has already been made once, by somebody else, and it cost them the room.</p>
+    </aside>
+  </section>
 
-    <pre><b># Jane Doe verified catalog</b>
-Title: Jane Doe verified catalog
-Type: creator
-
-<b>## Creator</b>
-| platform | profile |
-| spotify  | https://open.spotify.com/artist/0123456789abcdefghijkl |
-
-<b>## Mine</b>
-| platform | id                     | title     | disclosure                     |
-| spotify  | 4aBcdefghijklmnopqrstu | Blue Room | <i>vocals:human</i>; art:ai-generated |
-
-<b>## Not mine</b>
-| platform | id                     | title               | first seen | note                 |
-| spotify  | 9xYcdefghijklmnopqrstu | <s>Midnight Jazz Vibes</s> | 2026-09-14 | not ours, reported   |</pre>
-
-    <div class="note">
-      <b>Proving it's you doesn't need an account.</b> You paste the list URL into a bio only you can edit, in
-      Spotify for Artists or Author Central, and the list names that profile back. Both directions have to match,
-      and the second half is the one that matters: anyone can write a list claiming your catalog, but they can't
-      make your profile point at it. Everyone's copy checks that for itself before it shows a badge.
+  <section class="spread flip" id="install">
+    <aside class="margin">
+      <h4>Honest limits</h4>
+      <p>It only runs while your browser is open.</p>
+      <p>Blocker features are experimental, off by default, and web client only.</p>
+      <p>It writes the takedown. You send it.</p>
+    </aside>
+    <div class="prose">
+      <h2>It isn't in the store yet.</h2>
+      <p>
+        For now you build it and load the folder yourself. Chrome, developer mode, load unpacked, point it at
+        <code>dist</code>. Firefox once the Chrome one stops moving around.
+      </p>
+      <div class="doc">npm install<br />npm run build</div>
+      <p style="margin-top: 20px">
+        <a class="solid" href="https://github.com/NTBooks/Sloppycat">Get it on GitHub</a>
+      </p>
+      <p style="margin-top: 26px">
+        <b>tl;dr:</b> people upload AI slop under other people's names and the platforms wave it through. You
+        snapshot your own profile, untick what isn't yours, and it watches the page and writes your takedown
+        letters. Everyone else can subscribe to your list and see the junk marked before they press play. It
+        doesn't fix the hole. It does mean you find out in an hour instead of whenever a fan gets round to
+        emailing you.
+      </p>
     </div>
   </section>
 
-  <section id="industry">
-    <p class="eyebrow">Labels, managers, lawyers</p>
-    <h2>One list can cover a whole roster.</h2>
-    <p class="intro">
-      You already have this data. It's what your DDEX feed tells the platforms, or your ONIX feed if you do
-      books: exactly which releases are yours, with the ISRCs and UPCs attached. What nobody publishes is a
-      version of that a browser can check, which is a decent part of why this scam works at all.
-    </p>
-    <p class="intro" style="margin-top: 12px">
-      Put every artist's profile in one list, publish it once, and have each artist's bio point at it. There's
-      no fee, no application, and nothing to sign, because there's nobody in the middle. Like an ad blocker,
-      this only does anything if the people who own the catalogs publish the lists.
-    </p>
-  </section>
-
-  <section id="get">
-    <p class="eyebrow">Install</p>
-    <h2>It isn't in the store yet.</h2>
-    <p class="intro">
-      For now you build it and load the folder yourself. Chrome, developer mode, load unpacked, point it at
-      <code>dist</code>. Firefox once the Chrome one stops moving around.
-    </p>
-    <pre>npm install
-npm run build</pre>
-    <div class="cta">
-      <a class="btn go" href="https://github.com/">Get it on GitHub</a>
-      <a class="btn" href="#artists">Back to the top</a>
+  <footer class="colophon">
+    <div>
+      <h4>Colophon</h4>
+      <p>Built by one person over a couple of days in September 2026, with a lot of reading first.</p>
+      <p>Set in Fraunces and Newsreader, with IBM Plex Mono for anything a machine wrote.</p>
     </div>
-    <div class="note">
-      Worth saying up front: checks only run while your browser is open, because that's as far as an extension
-      reaches. Leave Chrome running and hourly means hourly. Close it Friday night and it picks up on Monday.
+    <div>
+      <h4>Read the workings</h4>
+      <p><a href="https://github.com/NTBooks/Sloppycat/tree/main/research">The research, with sources</a></p>
+      <p><a href="https://github.com/NTBooks/Sloppycat/blob/main/docs/trust.md">Who gets to speak for a profile</a></p>
+      <p><a href="https://github.com/NTBooks/Sloppycat/blob/main/docs/list-format.md">The list format</a></p>
     </div>
-  </section>
-
-  <section>
-    <h2>This is a band-aid</h2>
-    <p class="intro">
-      The actual fix is the platform asking you first, before it puts a release on your page. Spotify is testing
-      that now, which is good, and it took a couple of years of this happening first. Amazon and Goodreads have
-      nothing like it. So until they get around to it, this is the part you can do yourself without waiting for
-      anyone's permission.
-    </p>
-    <p class="intro" style="margin-top: 14px">
-      <b>tl;dr:</b> people upload AI slop under other people's names and the platforms wave it through. You snapshot
-      your own profile, untick what isn't yours, and it watches the page and writes your takedown letters. Everyone
-      else can subscribe to your list and see the junk flagged before they press play. It doesn't fix the hole. It
-      does mean you find out in an hour instead of whenever a fan gets round to emailing you.
-    </p>
-  </section>
-</main>
-
-<footer>
-  <div class="wrap row">
-    <img class="logo" src="icon-128.png" alt="" style="width: 22px; height: 22px" />
-    <span>Sloppycat</span>
-    <span class="spacer" style="flex: 1"></span>
-    <a href="#artists">For artists</a>
-    <a href="#blockers">For blockers</a>
-    <a href="#lists">Lists</a>
-    <a href="https://github.com/">Source</a>
-  </div>
-</footer>
+    <div>
+      <h4>Source</h4>
+      <p><a href="https://github.com/NTBooks/Sloppycat">github.com/NTBooks/Sloppycat</a></p>
+      <p>MIT licensed. No accounts, no server, nothing to sell.</p>
+    </div>
+  </footer>
+</div>
 
 <script>
-  // The hero plays one short sequence: a release that nobody uploaded shows up, gets flagged, and the
-  // card explains who said so. Then it resets and waits a while before doing it again.
+  // The opening plays the thing this exists for: a release nobody uploaded arrives, gets marked, and the
+  // slip says who said so. Then it clears and waits a while before doing it again.
   (function () {
     var rig = document.getElementById("rig");
     if (!rig) return;
-    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    function intruder() {
+    function build() {
       var row = document.createElement("div");
-      row.className = "trk fake" + (reduce ? "" : " landing");
+      row.className = "cut wrong" + (still ? "" : " arriving");
       row.innerHTML =
-        '<div class="art"></div><div><div class="nm"><span class="t">Midnight Jazz Vibes</span>' +
-        '<span class="badge bad">✗</span></div><div class="sub">Single · 2026 · 8412 Records DK</div></div>';
-      var card = document.createElement("div");
-      card.className = "verdict";
-      card.innerHTML =
-        '<div class="vh">✗ Artist says this is NOT theirs</div>' +
+        '<div class="sleeve"></div><div><div class="t"><span class="n">Midnight Jazz Vibes</span>' +
+        '<span class="tag no">✗︎</span></div><div class="m">Single · 2026 · 8412 Records DK</div></div>';
+      var slip = document.createElement("div");
+      slip.className = "slip";
+      slip.innerHTML =
+        '<div class="hd">✗︎ The artist says this isn\'t theirs</div>' +
         "<p>Not ours. Uploaded through a distributor under our name. Reported 15 Sep.</p>" +
-        '<div class="src">from list: <a href="#lists">The Smiths verified catalog</a></div>';
-      return { row: row, card: card };
+        '<div class="from">from list: The Smiths verified catalog</div>';
+      return { row: row, slip: slip };
     }
 
     function run() {
-      var made = intruder();
+      var made = build();
       rig.insertBefore(made.row, rig.firstChild);
-      rig.insertBefore(made.card, made.row.nextSibling);
-      if (reduce) return; // leave it on screen, no loop
+      rig.insertBefore(made.slip, made.row.nextSibling);
+      if (still) return;
       setTimeout(function () {
-        made.card.style.transition = "opacity 400ms";
-        made.row.style.transition = "opacity 400ms";
-        made.card.style.opacity = "0";
-        made.row.style.opacity = "0";
+        made.row.style.transition = made.slip.style.transition = "opacity 420ms";
+        made.row.style.opacity = made.slip.style.opacity = "0";
         setTimeout(function () {
-          made.card.remove();
           made.row.remove();
-          setTimeout(run, 2600);
-        }, 420);
-      }, 6200);
+          made.slip.remove();
+          setTimeout(run, 2800);
+        }, 440);
+      }, 6400);
     }
 
-    setTimeout(run, reduce ? 0 : 1100);
+    setTimeout(run, still ? 0 : 1200);
   })();
 </script>

@@ -3,7 +3,7 @@
 <!-- sloppycat/v1 -->
 Title: Sloppycat community list
 Type: community
-Homepage: https://github.com/sloppycat/lists
+Homepage: https://github.com/NTBooks/Sloppycat
 Version: 2026-09-22
 Expires: 1 day
 Baseline-before: 2022-11-30

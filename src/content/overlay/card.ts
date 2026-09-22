@@ -9,11 +9,12 @@ export const STATUS_TEXT: Record<Verdict["status"], string> = {
   likely_accurate: "Likely genuine: released before AI knockoffs took off",
 };
 
+// U+FE0E keeps these as text glyphs; without it Windows renders emoji versions that ignore the badge colour.
 export const STATUS_GLYPH: Record<Verdict["status"], string> = {
-  verified: "✓",
-  not_mine: "✗",
-  unconfirmed: "○",
-  likely_accurate: "◷",
+  verified: "✓︎",
+  not_mine: "✗︎",
+  unconfirmed: "○︎",
+  likely_accurate: "◷︎",
 };
 
 export function esc(s: string): string {

@@ -38,7 +38,10 @@ const DEFAULTS: Schema = {
 export async function get<K extends keyof Schema>(key: K): Promise<Schema[K]> {
   const res = await chrome.storage.local.get(key);
   const v = res[key];
-  if (key === "settings") return { ...DEFAULT_SETTINGS, ...(v ?? {}) } as Schema[K];
+  if (key === "settings") {
+    const s = (v ?? {}) as Partial<Settings>;
+    return { ...DEFAULT_SETTINGS, ...s, experiments: { ...DEFAULT_SETTINGS.experiments, ...(s.experiments ?? {}) } } as Schema[K];
+  }
   return (v ?? DEFAULTS[key]) as Schema[K];
 }
 
