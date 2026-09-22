@@ -30,6 +30,7 @@ see the fakes flagged on the page before they press play or buy.
 - [For slopblockers](#for-slopblockers) — subscribe, badges, uBlock export
 - [How it gets the data](#how-it-gets-the-data)
 - [What it won't do](#what-it-wont-do)
+- [How the trust works](docs/trust.md) and [the research behind it](research/)
 
 ---
 
@@ -237,7 +238,7 @@ npm run preview
 `preview` serves the extension pages with a fake browser API so you can poke at the UI in a normal tab;
 `/demo` renders the overlay against a mock platform page, which is where these screenshots come from.
 
-Also here: [the list format](docs/list-format.md) · [what ships in the default list](docs/baseline-plan.md) ·
+Also here: [who gets to speak for a profile](docs/trust.md) · [user reports](docs/reporting.md) · [research, with sources](research/) · [the list format](docs/list-format.md) · [what ships in the default list](docs/baseline-plan.md) ·
 [how the community list is policed](lists/CONTRIBUTING.md) · [marketing notes](docs/marketing.md)
 
 ## This needs people whose word carries
