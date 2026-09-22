@@ -70,5 +70,7 @@ part of the record: <https://github.com/NTBooks/Sloppycat>
 
 ## Contact
 
-Open an issue at <https://github.com/NTBooks/Sloppycat/issues>, or write to the contact address shown on the
-extension's Chrome Web Store listing.
+Open an issue at <https://github.com/NTBooks/Sloppycat/issues>, or write to sloptrawler@gmail.com.
+
+The published copy of this policy, which is the URL given to the Chrome Web Store, is
+<https://ntbooks.github.io/Sloppycat/docs/privacy.html>.

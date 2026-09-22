@@ -76,7 +76,8 @@ website content is sent anywhere. All processing is local.
 Then affirm all three certifications: no sale of data, no use outside the single purpose, no use for
 creditworthiness.
 
-**Privacy policy URL:** the published copy of [privacy.md](privacy.md).
+**Privacy policy URL:** <https://ntbooks.github.io/Sloppycat/docs/privacy.html> (source: [privacy.html](privacy.html),
+kept in step with [privacy.md](privacy.md)).
 
 ## Assets
 
@@ -85,6 +86,8 @@ creditworthiness.
 - Small promo tile, 440×280: optional, only needed for featuring
 
 ## The account
+
+Registered as **sloptrawler@gmail.com**, publisher display name **Sloppycat**, fee paid.
 
 The developer account is an ordinary Google account: a personal Gmail or a Workspace account on a domain you
 own. A YouTube Brand Account cannot be used, because Brand Accounts have been limited to YouTube since 2021.

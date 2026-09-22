@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sloppycat privacy policy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=IBM+Plex+Mono:wght@400&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap"
+    />
+    <style>
+      :root {
+        --ink: #0e1013;
+        --paper: #edeae4;
+        --dim: #a9a49b;
+        --rule: #2b2f35;
+        --amber: #e8973c;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--ink);
+        color: var(--paper);
+        font: 400 17px/1.65 "Newsreader", Georgia, serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .sheet {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 40px 24px 80px;
+      }
+      h1,
+      h2 {
+        font-family: "Fraunces", Georgia, serif;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        margin: 0;
+      }
+      h1 {
+        font-weight: 900;
+        font-size: clamp(30px, 5vw, 44px);
+      }
+      h2 {
+        font-weight: 600;
+        font-size: 22px;
+        margin: 36px 0 12px;
+        padding-top: 18px;
+        border-top: 1px solid var(--rule);
+      }
+      .dateline {
+        font: 400 12px/1 "IBM Plex Mono", ui-monospace, monospace;
+        color: var(--dim);
+        margin: 14px 0 26px;
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      a {
+        color: var(--amber);
+        text-underline-offset: 3px;
+      }
+      strong {
+        font-weight: 500;
+      }
+      ul {
+        padding-left: 20px;
+      }
+      li {
+        margin-bottom: 8px;
+      }
+      code {
+        font: 400 14px/1 "IBM Plex Mono", ui-monospace, monospace;
+        color: var(--dim);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 6px 0 18px;
+        font-size: 15px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 10px 10px 10px 0;
+        border-bottom: 1px solid var(--rule);
+        vertical-align: top;
+      }
+      th {
+        font: 400 11px/1.2 "IBM Plex Mono", ui-monospace, monospace;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--dim);
+      }
+      footer {
+        margin-top: 44px;
+        padding-top: 18px;
+        border-top: 1px solid var(--rule);
+        font-size: 14px;
+        color: var(--dim);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="sheet">
+      <h1>Sloppycat privacy policy</h1>
+      <p class="dateline">Last updated 22 September 2026</p>
+
+      <p>
+        Sloppycat is a browser extension that watches a creator's own public profiles for releases they didn't
+        publish, and marks items that creators have publicly disowned.
+      </p>
+
+      <h2>What it collects</h2>
+      <p>
+        <strong>Nothing.</strong> There is no account, no server run by this project, no analytics, no telemetry,
+        and no identifier of any kind assigned to you.
+      </p>
+      <p>
+        Everything the extension records is stored by Chrome on your own computer, in the extension's local
+        storage, readable only by the extension. That means the profiles you chose to watch and the catalog
+        snapshots taken from them, alerts and the decisions you made about them, your own list until you choose to
+        publish it somewhere, the list subscriptions you added with a cached copy of each, and your settings.
+      </p>
+      <p>Remove the extension and all of it goes. You can also clear it piece by piece in Settings.</p>
+
+      <h2>What it sends, and to whom</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Where</th>
+            <th>Why</th>
+            <th>When</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>The platforms you watch: Spotify, Apple Music, Deezer, Amazon, Goodreads, Google Books</td>
+            <td>To read the public catalog of the profiles you added, the same pages your browser would load if you visited them</td>
+            <td>On the schedule you set, and when you press a button</td>
+          </tr>
+          <tr>
+            <td>The list URLs you subscribed to</td>
+            <td>To fetch those lists</td>
+            <td>On the list's refresh interval</td>
+          </tr>
+          <tr>
+            <td>GitHub, if you choose to sign in</td>
+            <td>To create or update your own list as a Gist, at your request</td>
+            <td>Only when you ask</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Requests to the platforms are made by your browser, in your own session, and look like ordinary browsing.
+        The extension does <strong>not</strong> report the pages you visit to this project or anyone else: when it
+        marks items on a page, it checks them against lists already cached on your computer.
+      </p>
+
+      <h2>What it does not do</h2>
+      <ul>
+        <li>It does not collect personal information, browsing history, credentials, payment details, health or location data.</li>
+        <li>It does not sell or share data, because it has none to sell or share.</li>
+        <li>It does not run remote code. All code ships in the extension package.</li>
+        <li>It does not transmit your list anywhere unless you publish it yourself.</li>
+      </ul>
+
+      <h2>Permissions, and why each one exists</h2>
+      <ul>
+        <li><strong>storage</strong> keeps your watched profiles, snapshots, decisions and settings on your computer.</li>
+        <li><strong>alarms</strong> schedules the periodic check. Without it, checks would stop when the browser worker sleeps.</li>
+        <li><strong>notifications</strong> tells you when something new appears on a profile you watch.</li>
+        <li><strong>tabs</strong> and <strong>scripting</strong> read the public catalog from a platform page, and mark items on pages when you have turned that on. Used only on the sites below.</li>
+        <li><strong>offscreen</strong> parses saved HTML from a platform page, which Chrome's extension worker cannot do on its own.</li>
+        <li>
+          <strong>Host permissions</strong> for <code>open.spotify.com</code>, <code>api-partner.spotify.com</code>,
+          <code>music.apple.com</code>, <code>itunes.apple.com</code>, <code>deezer.com</code>,
+          <code>api.deezer.com</code>, <code>amazon.com</code> and its country domains,
+          <code>goodreads.com</code>, <code>googleapis.com</code> and <code>openlibrary.org</code>: the platforms
+          whose catalogs it reads. Plus <code>raw.githubusercontent.com</code>,
+          <code>gist.githubusercontent.com</code>, <code>gist.github.com</code>, <code>api.github.com</code> and
+          <code>github.com</code>: where lists are fetched from and, at your request, published to.
+        </li>
+      </ul>
+
+      <h2>Children</h2>
+      <p>The extension is not directed at children and collects nothing from anyone.</p>
+
+      <h2>Changes</h2>
+      <p>
+        Any change to this policy is committed to the public repository, so the history of what was promised is
+        part of the record: <a href="https://github.com/NTBooks/Sloppycat">github.com/NTBooks/Sloppycat</a>
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Open an issue at
+        <a href="https://github.com/NTBooks/Sloppycat/issues">github.com/NTBooks/Sloppycat/issues</a>, or write to
+        <a href="mailto:sloptrawler@gmail.com">sloptrawler@gmail.com</a>.
+      </p>
+
+      <footer>Sloppycat is open source, MIT licensed.</footer>
+    </main>
+  </body>
+</html>
