@@ -16,31 +16,44 @@ import { GITHUB_CLIENT_ID, startDeviceFlow, pollDeviceFlow, upsertGist } from ".
 function Profiles() {
   const [profiles] = useStorage("profiles");
   const [url, setUrl] = useState("");
+  const [watchOnly, setWatchOnly] = useState(true);
   const [err, setErr] = useState("");
   const run = useRun();
   const list = Object.entries(profiles ?? {});
   return (
     <section class="card stack">
-      <h2>Watched profiles</h2>
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">Watched profiles</h2>
+        <a href="../following/index.html">Open the Following page</a>
+      </div>
       <form
         class="row"
         onSubmit={async (e) => {
           e.preventDefault();
           setErr("");
-          const r = await send<{ ok: boolean; error?: string }>({ type: "profile:add", url });
+          const r = await send<{ ok: boolean; error?: string }>({ type: "profile:add", url, watchOnly });
           if (!r.ok) setErr(r.error ?? "Could not add");
           else setUrl("");
         }}
       >
         <input type="url" placeholder="Paste a Spotify / Apple Music / Deezer / Amazon author / Goodreads author URL" value={url} onInput={(e) => setUrl((e.target as HTMLInputElement).value)} style="flex:1" />
+        <select value={watchOnly ? "fan" : "mine"} onChange={(e) => setWatchOnly((e.target as HTMLSelectElement).value === "fan")} title="Whose page this is">
+          <option value="fan">I follow them</option>
+          <option value="mine">It's mine</option>
+        </select>
         <Button type="submit" kind="primary">
           Watch
         </Button>
       </form>
+      <div class="muted" style="font-size:12px">
+        A page you follow is watched and nothing more: no list to publish, no bio to claim, and alerts on it never write into your own
+        list. Use the wizard for your own page, where the rest of that applies. This table is the settings view; the Following page is
+        the same profiles laid out to read.
+      </div>
       {err && <div class="notice bad">{err}</div>}
       <RunPanel run={run} />
       {list.length === 0 ? (
-        <Empty>No profiles yet. Add one above, or use the popup on your own profile page.</Empty>
+        <Empty>No profiles yet. Add one above, or use the popup on a profile page you have open.</Empty>
       ) : (
         <table>
           <thead>
@@ -63,13 +76,22 @@ function Profiles() {
                   </div>
                 </td>
                 <td>
-                  {p.verified ? <Chip tone="ok">Verified</Chip> : adapterFor(p.platform).supportsBio ? <Chip>Unclaimed</Chip> : <Chip>No bio on this platform</Chip>}
-                  {adapterFor(p.platform).supportsBio && (
-                    <div class="muted" style="font-size:12px">
-                      {p.verified
-                        ? "Your list link is in the bio and names this profile."
-                        : "Looked for your list link on the last check. Add it to the bio and it will be picked up on the next one."}
-                    </div>
+                  {p.watchOnly ? (
+                    <span title="Someone else's page. Watched, and nothing more.">
+                      <Chip>Following</Chip>
+                    </span>
+                  ) : p.verified ? (
+                    <span title="This profile's bio links to your list, so every copy of the extension can tell the list really speaks for it.">
+                      <Chip tone="ok">Claimed</Chip>
+                    </span>
+                  ) : adapterFor(p.platform).supportsBio ? (
+                    <span title="Your list works as it is. Putting its URL in this profile's bio is what proves the list is yours. Every check looks again, so there is nothing to press.">
+                      <Chip>List link not in bio yet</Chip>
+                    </span>
+                  ) : (
+                    <span title="This platform has no bio only the account holder can edit, so there is nothing here to prove it with. Claim on Spotify, Amazon or Goodreads instead.">
+                      <Chip>No bio on this platform</Chip>
+                    </span>
                   )}
                   {p.lastError && (
                     <div class="muted" style="font-size:12px;color:var(--bad)">
@@ -79,15 +101,23 @@ function Profiles() {
                 </td>
                 <td class="when">{fmtDate(p.lastRunAt)}</td>
                 <td class="row" style="justify-content:flex-end">
+                  <select
+                    value={p.watchOnly ? "fan" : "mine"}
+                    onChange={(e) => void send({ type: "profile:watchOnly", profileKey: key, watchOnly: (e.target as HTMLSelectElement).value === "fan" })}
+                    title="Whose page this is. A page you follow is watched and nothing else."
+                  >
+                    <option value="fan">I follow them</option>
+                    <option value="mine">It's mine</option>
+                  </select>
                   <Button
                     onClick={() => void send({ type: "run:now", profileKey: key })}
                     disabled={run.running}
-                    title={run.running ? "A check is already running" : "Check this profile now"}
+                    title={run.running ? "A check is already running" : "Read the page now and compare it with the last snapshot, instead of waiting for the timer"}
                   >
-                    {run.running && run.currentKey === key ? "Checking…" : "Check"}
+                    {run.running && run.currentKey === key ? "Checking…" : "Check now"}
                   </Button>
-                  <Button kind="danger" onClick={() => void send({ type: "profile:remove", profileKey: key })}>
-                    Remove
+                  <Button kind="danger" onClick={() => void send({ type: "profile:remove", profileKey: key })} title="Forget this page and its snapshot. Alerts it already raised stay.">
+                    Stop watching
                   </Button>
                 </td>
               </tr>
@@ -109,9 +139,9 @@ function General() {
         <div>
           <label>Mode</label>
           <select value={settings.mode} onChange={(e) => void setSettings({ ...settings, mode: (e.target as HTMLSelectElement).value as typeof settings.mode })}>
-            <option value="both">Creator + blocker</option>
-            <option value="creator">Creator only</option>
-            <option value="consumer">Blocker only</option>
+            <option value="both">Watch pages + badge them</option>
+            <option value="creator">Watch pages only</option>
+            <option value="consumer">Badge pages only</option>
           </select>
         </div>
         <div>
@@ -125,10 +155,11 @@ function General() {
           />
         </div>
         <div>
-          <label>Lookalike search every N checks</label>
+          <label title="Only does anything while Wider search is turned on below.">Lookalike search every N checks</label>
           <input
             type="number"
             min={1}
+            disabled={!settings.experiments.lookalikeSearch}
             value={settings.lookalikeEveryNRuns}
             onChange={(e) => void setSettings({ ...settings, lookalikeEveryNRuns: Math.max(1, Number((e.target as HTMLInputElement).value) || 6) })}
           />
@@ -143,7 +174,7 @@ function General() {
             type="checkbox"
             class="toggle"
             checked={settings.listUpdates}
-            disabled={!settings.notifications || settings.mode === "creator"}
+            disabled={!settings.notifications}
             onChange={(e) => void setSettings({ ...settings, listUpdates: (e.target as HTMLInputElement).checked })}
           />
         </div>
@@ -219,6 +250,47 @@ function Experimental() {
   );
 }
 
+function WiderSearch() {
+  const [settings, setSettings] = useStorage("settings");
+  if (!settings) return null;
+  const on = settings.experiments.lookalikeSearch;
+  return (
+    <section class="card stack">
+      <div class="row">
+        <h2 style="margin:0">Wider search</h2>
+        <Chip tone="warn">Experimental</Chip>
+      </div>
+      <p class="muted" style="margin:0">
+        Off by default, and worth leaving off unless you are willing to sort through it. Everything above works
+        from what is on the page you watch. This looks past it, for titles elsewhere on the platform that resemble
+        yours, which means it is guessing from titles alone: a common phrase in one of your titles will keep
+        turning up other people's records. It cannot tell a coincidence from a hijack, so it asks you to.
+      </p>
+      <div class="row" style="align-items:flex-start;gap:12px">
+        <input
+          type="checkbox"
+          class="toggle"
+          checked={on}
+          style="margin-top:3px"
+          onChange={(e) =>
+            void setSettings({
+              ...settings,
+              experiments: { ...settings.experiments, lookalikeSearch: (e.target as HTMLInputElement).checked },
+            })
+          }
+        />
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600">Search for lookalike titles</div>
+          <div class="muted" style="font-size:12px">
+            Runs on the cadence set in General, and only ever raises a heads-up. Nothing it finds is ever treated
+            as a claim about anybody.
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function MyList() {
   const [myList] = useStorage("myList");
   const [settings, setSettings] = useStorage("settings");
@@ -231,7 +303,8 @@ function MyList() {
       <h2>My list</h2>
       {!myList ? (
         <Empty>
-          Nothing yet. Run the <a href="../onboard/index.html">snapshot wizard</a> on your profile.
+          Nothing yet, and nothing needed if the pages you watch are other people's. This is where your own catalog goes: run the{" "}
+          <a href="../onboard/index.html">snapshot wizard</a> on a profile you hold the account for.
         </Empty>
       ) : (
         <>
@@ -519,6 +592,7 @@ function Options() {
       <Profiles />
       <General />
       <Experimental />
+      <WiderSearch />
       <MyList />
       <Sources />
       <Testing />

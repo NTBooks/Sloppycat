@@ -112,9 +112,17 @@ And Spotify only hands over your ten newest albums and ten newest singles, so a 
 sits where that view never reaches: the extension pages past it where it can, and watches the release counts
 to catch it where it cannot. The full list is in [what it cannot see](docs/limits.md).
 
+### Following someone else's page
+
+Most of the above is written for the account holder, but the watching half works just as well on a page you
+don't own. Open an artist or author you follow, hit **I follow this artist**, and the wizard takes one
+snapshot as a baseline and stops there. No list to write, no bio to claim, no takedown letters, because none
+of that is yours to do. You get told when something new turns up, with the same signals attached, and if that
+artist publishes a list of their own you can subscribe to it from the last step so their answer arrives with
+the alert.
+
 There is a **Testing** panel in Settings that plants an alert on a watched profile, so you can walk the whole
-path without waiting for a real one. You do not need to be published to try any of this: watch any public
-profile.
+path without waiting for a real one.
 
 ---
 

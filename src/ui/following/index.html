@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Sloppycat: pages you watch</title>
+    <link rel="stylesheet" href="../base.css" />
+    <style>
+      /* A following list should look like a shelf, so each page leads with its covers. */
+      .sleeves { display: flex; gap: 6px; flex-wrap: nowrap; overflow: hidden; }
+      .sleeves .thumb { width: 44px; height: 44px; }
+      .who { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; }
+      .who h2 { margin: 0; font-size: 15px; }
+      .who h2 a { color: var(--fg); }
+      .facts { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-top: 3px; }
+      .lane { display: grid; gap: 10px; }
+      /* Links that sit in a button row need to stop behaving like links. */
+      a.btn { display: inline-block; text-decoration: none; }
+      a.btn:hover { text-decoration: none; }
+      .who a.chip-link:hover { text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="index.js"></script>
+  </body>
+</html>

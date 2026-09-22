@@ -15,11 +15,22 @@ const store = {
   settings: { mode: "both", intervalMinutes: 60, lookalikeEveryNRuns: 6, notifications: true, listUpdates: true, defaultDisclosure: { text: "human" }, myListUrl: "https://gist.githubusercontent.com/jane/abc/raw" },
   profiles: {
     "spotify:3yY2gUcIsjMr8hjo51PoJ8": { platform: "spotify", profileId: "3yY2gUcIsjMr8hjo51PoJ8", url: "https://open.spotify.com/artist/3yY2gUcIsjMr8hjo51PoJ8", displayName: "The Smiths", addedAt: "2026-09-20T10:00:00Z", lastRunAt: "2026-09-22T12:00:00Z", verified: true },
-    "amazon:www.amazon.com|B001IGFHW6": { platform: "amazon", profileId: "www.amazon.com|B001IGFHW6", url: "https://www.amazon.com/stores/author/B001IGFHW6", displayName: "Jane Doe", addedAt: "2026-09-20T10:00:00Z", lastRunAt: "2026-09-22T12:00:00Z", lastError: "Bot challenge at https://www.amazon.com/stores/author/B001IGFHW6/allbooks" }
+    "amazon:www.amazon.com|B001IGFHW6": { platform: "amazon", profileId: "www.amazon.com|B001IGFHW6", url: "https://www.amazon.com/stores/author/B001IGFHW6", displayName: "Jane Doe", addedAt: "2026-09-20T10:00:00Z", lastRunAt: "2026-09-22T12:00:00Z", watchOnly: true, verifiedListUrl: "https://gist.githubusercontent.com/janedoe/def/raw", lastError: "Bot challenge at https://www.amazon.com/stores/author/B001IGFHW6/allbooks" }
   },
   alerts: {
     a1: { id: "a1", profileKey: "spotify:3yY2gUcIsjMr8hjo51PoJ8", createdAt: "2026-09-22T11:00:00Z", change: "added", signals: [{ kind: "distributor_placeholder", label: "8412 Records DK" }, { kind: "first_time_label", label: "8412 Records DK", knownLabels: ["wm uk", "rhino"] }], item: { platform: "spotify", itemId: "9xYcdefghijklmnopqrstu", title: "Midnight Jazz Vibes", kind: "single", releaseDate: "2026-09-14", label: "8412 Records DK", url: "https://open.spotify.com/album/9xYcdefghijklmnopqrstu", firstSeen: "2026-09-22T11:00:00Z", source: "profile" } },
     a2: { id: "a2", profileKey: "amazon:www.amazon.com|B001IGFHW6", createdAt: "2026-09-21T09:00:00Z", change: "lookalike", signals: [{ kind: "lookalike", ofTitle: "The Long Field", score: 0.93 }, { kind: "indie_zero_reviews" }], item: { platform: "amazon", itemId: "B0FAKE0001", title: "The Long Field: Summary & Analysis", kind: "book", label: "Independently published", url: "https://www.amazon.com/dp/B0FAKE0001", firstSeen: "2026-09-21T09:00:00Z", source: "search", meta: { reviewCount: 0 } }, resolution: undefined }
+  },
+  snapshots: {
+    "spotify:3yY2gUcIsjMr8hjo51PoJ8": { profileKey: "spotify:3yY2gUcIsjMr8hjo51PoJ8", takenAt: "2026-09-22T12:00:00Z", items: [
+      { platform: "spotify", itemId: "06Ey2y54V4aGjP5EsovA2O", title: "Rank", kind: "album", releaseDate: "1988-09-05", label: "WM UK", url: "https://open.spotify.com/album/06Ey2y54V4aGjP5EsovA2O", imageUrl: "https://i.scdn.co/image/ab67616d00001e02e1aaa4fd75e14d1cfaff7e36", firstSeen: "2026-09-20T10:00:00Z", source: "profile" },
+      { platform: "spotify", itemId: "5Y0p2XCgRRIjna91aQE8q7", title: "The Queen Is Dead", kind: "album", releaseDate: "1986-06-16", label: "WM UK", url: "https://open.spotify.com/album/5Y0p2XCgRRIjna91aQE8q7", imageUrl: "https://i.scdn.co/image/ab67616d00001e026236778a208a15eb71079601", firstSeen: "2026-09-20T10:00:00Z", source: "profile" },
+      { platform: "spotify", itemId: "9xYcdefghijklmnopqrstu", title: "Midnight Jazz Vibes", kind: "single", releaseDate: "2026-09-14", label: "8412 Records DK", url: "https://open.spotify.com/album/9xYcdefghijklmnopqrstu", firstSeen: "2026-09-22T11:00:00Z", source: "profile" }
+    ] },
+    "amazon:www.amazon.com|B001IGFHW6": { profileKey: "amazon:www.amazon.com|B001IGFHW6", takenAt: "2026-09-22T12:00:00Z", items: [
+      { platform: "amazon", itemId: "B001IGFHW60", title: "The Long Field", kind: "book", releaseDate: "2019-04-02", url: "https://www.amazon.com/dp/B001IGFHW60", firstSeen: "2026-09-20T10:00:00Z", source: "profile" },
+      { platform: "amazon", itemId: "B001IGFHW61", title: "Winter Term", kind: "book", releaseDate: "2022-01-11", url: "https://www.amazon.com/dp/B001IGFHW61", firstSeen: "2026-09-20T10:00:00Z", source: "profile" }
+    ] }
   },
   listSources: [
     { url: "https://raw.githubusercontent.com/sloppycat/lists/main/community.md", enabled: true, builtin: true, title: "Sloppycat community list", type: "community", entryCount: 0, fetchedAt: "2026-09-22T12:00:00Z" },
@@ -111,6 +122,11 @@ const DEMO = `<!doctype html><html><head><meta charset="utf-8"><title>Sloppycat 
   .demo-row { display:flex; gap:14px; align-items:center; padding:9px 10px; border-radius:6px; }
   .demo-row:hover { background:#1a1a1a; }
   .demo-art { width:46px; height:46px; border-radius:3px; background:linear-gradient(135deg,#3a3a3a,#242424); flex:none; }
+  /* Stand-in sleeves, drawn not loaded, so the demo needs no network and borrows nobody's cover. */
+  .demo-art.s1 { background:radial-gradient(circle at 66% 34%, rgba(14,16,19,.75) 0 30%, transparent 31%), linear-gradient(150deg,#e8973c,#9d5a1c); }
+  .demo-art.s2 { background:repeating-linear-gradient(135deg, rgba(14,16,19,.5) 0 5px, transparent 5px 13px), linear-gradient(160deg,#c2504a,#7d2d2c); }
+  .demo-art.s3 { background:linear-gradient(180deg, transparent 0 26%, rgba(14,16,19,.62) 26% 40%, transparent 40% 56%, rgba(14,16,19,.62) 56% 70%, transparent 70%), linear-gradient(200deg,#8aa98a,#4e6b52); }
+  .demo-art.s4 { background:repeating-radial-gradient(circle at 50% 50%, rgba(14,16,19,.5) 0 3px, transparent 3px 8px), linear-gradient(140deg,#7f93ad,#46566b); }
   .demo-title { color:#fff; font-weight:600; text-decoration:none; }
   .demo-meta { color:#a7a7a7; font-size:12px; }
 </style></head><body>

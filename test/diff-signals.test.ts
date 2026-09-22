@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { diffSnapshots } from "../src/diff";
-import { isLookalike, similarity } from "../src/lookalike";
+import { isLookalike, sameCredit, similarity } from "../src/lookalike";
 import { lookalikeSignal, signalsFor } from "../src/signals";
 import type { SnapshotItem } from "../src/types";
 
@@ -38,6 +38,31 @@ describe("lookalike", () => {
   it("does not flag unrelated titles", () => {
     expect(isLookalike("Blue Room", "Red Planet")).toBe(false);
     expect(similarity("How to Write a Novel", "How to Cook Rice")).toBeLessThan(0.82);
+  });
+  it("does not flag a title merely contained in a longer watched one", () => {
+    // A clone pads the real title; it does not shorten it. "Birthday Boy" is a common enough song name
+    // that finding one near "Bunky Becky Birthday Boy" says nothing at all.
+    expect(isLookalike("Birthday Boy", "Bunky Becky Birthday Boy")).toBe(false);
+    expect(isLookalike("Birthday Boy (Party Favors)", "Bunky Becky Birthday Boy")).toBe(false);
+    expect(similarity("Birthday Boy", "Bunky Becky Birthday Boy")).toBeLessThan(0.82);
+    // Padding in the other direction is still the clone pattern, so it still fires.
+    expect(isLookalike("Bunky Becky Birthday Boy Remixes", "Bunky Becky Birthday Boy")).toBe(true);
+  });
+});
+
+describe("sameCredit", () => {
+  it("skips a release the platform credits to the watched artist", () => {
+    // Spotify gives market and deluxe editions their own album ids, so the artist's own record comes back
+    // from a title search looking like a perfect match for itself.
+    expect(isLookalike("Texis", "Texis")).toBe(true);
+    expect(sameCredit("Sleigh Bells", "Sleigh Bells")).toBe(true);
+    expect(sameCredit("sleigh bells", "Sleigh Bells")).toBe(true);
+  });
+  it("does not skip a different artist, or a missing credit", () => {
+    expect(sameCredit("Sleigh Bells Tribute Band", "Sleigh Bells")).toBe(false);
+    expect(sameCredit(undefined, "Sleigh Bells")).toBe(false);
+    expect(sameCredit("Sleigh Bells", undefined)).toBe(false);
+    expect(sameCredit("", "")).toBe(false);
   });
 });
 

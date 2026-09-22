@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lookalikeSignal, sameCreator } from "../src/signals";
+import { lookalikeSignal } from "../src/signals";
 import type { SnapshotItem } from "../src/types";
 
 const ARTIST_ID = "3yY2gUcIsjMr8hjo51PoJ8";
@@ -45,17 +45,11 @@ describe("lookalikeSignal against the artist's own catalogue", () => {
   });
 });
 
-describe("sameCreator", () => {
-  it("ignores case, punctuation, accents and a leading article", () => {
-    expect(sameCreator("Sleigh Bells", "sleigh bells")).toBe(true);
-    expect(sameCreator("The Smiths", "Smiths")).toBe(true);
-    expect(sameCreator("Beyoncé", "Beyonce")).toBe(true);
-    expect(sameCreator("Simon & Garfunkel", "Simon and Garfunkel")).toBe(true);
-  });
-
-  it("does not collapse different people, or guess when a name is missing", () => {
-    expect(sameCreator("Sleigh Bells", "Sleigh Bell")).toBe(false);
-    expect(sameCreator(undefined, "Sleigh Bells")).toBe(false);
-    expect(sameCreator("", "")).toBe(false);
+describe("a stricter name match is the safe direction", () => {
+  // Matching names suppresses an alert, so a lenient match hides clones. "Smiths" is a plausible
+  // impersonation of "The Smiths" and must still be reported.
+  it("does not treat a near-miss stage name as the same act", () => {
+    const near = item({ itemId: "gggggggggggggggggggggg", title: "Texis", subtitle: "Sleigh Bell" });
+    expect(lookalikeSignal(near, watched, creator)).not.toBeNull();
   });
 });

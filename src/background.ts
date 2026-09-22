@@ -455,7 +455,10 @@ export async function runAll(profileKeys?: string[]): Promise<void> {
     budget.startRun(queue.length);
     abandoned = false;
     const counter = await storage.update("runCounter", (n) => n + 1);
-    const doLookalike = counter % Math.max(1, settings.lookalikeEveryNRuns) === 0;
+    // Lookalike search is opt-in: it reads titles, not provenance, so most of what it finds is a
+    // coincidence rather than a hijack.
+    const doLookalike =
+      settings.experiments.lookalikeSearch && counter % Math.max(1, settings.lookalikeEveryNRuns) === 0;
     await log(`Checking ${queue.length} profile${queue.length === 1 ? "" : "s"}`);
     for (const key of queue) {
       const p = profiles[key]!;
@@ -494,8 +497,9 @@ export async function runProfile(profile: Profile, doLookalike: boolean): Promis
   const who = profile.displayName ?? profile.profileId;
   try {
     // The bio comes back with the snapshot on every platform that has one, so looking for the list
-    // link costs nothing extra once the page is already open.
-    const wantBio = adapter.supportsBio;
+    // link costs nothing extra once the page is already open. A page you follow has no list of
+    // yours to find, so it is not read and not asked about.
+    const wantBio = adapter.supportsBio && !profile.watchOnly;
     const result = await adapter.fetchSnapshot(profile.profileId, c, { withBio: wantBio });
     await log(`${who}: found ${result.items.length} release${result.items.length === 1 ? "" : "s"}`);
     await ingestSnapshot(profile, result, doLookalike);
@@ -609,6 +613,7 @@ export async function ingestSnapshot(profile: Profile, result: ExtractResult, do
     const existing = await storage.get("alerts");
     const alreadyAlerted = new Set(Object.values(existing).map((a) => itemKey(a.item)));
     // Search the most recent few titles; that is where clones cluster.
+    const owner = result.displayName ?? profile.displayName;
     for (const w of watched.slice(0, 3)) {
       try {
         await log(`Searching ${adapter.label} for copies of "${w.title}"`);
@@ -618,7 +623,7 @@ export async function ingestSnapshot(profile: Profile, result: ExtractResult, do
           if (alreadyAlerted.has(itemKey(cand))) continue;
           // The artist's own records come back in their own search results, often under a second
           // id for another market, so the creator is passed in and their own catalogue is skipped.
-          const sig = lookalikeSignal(cand, [w], { name: profile.displayName ?? result.displayName, id: profile.profileId });
+          const sig = lookalikeSignal(cand, [w], { name: profile.displayName ?? result.displayName ?? owner, id: profile.profileId });
           if (!sig) continue;
           alreadyAlerted.add(itemKey(cand));
           newAlerts.push({
@@ -682,9 +687,9 @@ async function notify(profile: Profile, alerts: Alert[]): Promise<void> {
 async function notifyListChanges(changes: ListChange[]): Promise<void> {
   if (!changes.length) return;
   const settings = await storage.get("settings");
+  // Gated on its own toggle only: watching pages without badging them is what following an artist
+  // looks like, and that is exactly when a list you subscribe to changing its mind matters.
   if (!settings.notifications || !settings.listUpdates) return;
-  // A creator-only install subscribes to lists to check its own claims, not to follow other people.
-  if (settings.mode === "creator") return;
   const { title, message } = summarize(changes);
   await chrome.notifications.create(`lists:${changes[0]!.id}`, {
     type: "basic",
@@ -751,6 +756,9 @@ async function resolveAlert(
 
   const profiles = await storage.get("profiles");
   const p = profiles[a.profileKey];
+  // A page you follow as a fan is not yours to speak for: resolving there records what you decided and
+  // stops. Writing it into your own list would put someone else's profile in your Creator table.
+  if (p?.watchOnly) return;
   const settings = await storage.get("settings");
   const existing = await storage.get("myList");
   const creator = p ? [{ platform: p.platform, profile: p.url }] : [];
@@ -792,10 +800,15 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         const m = msg as Extract<Message, { type: "profile:add" }>;
         const det = detectProfile(m.url);
         if (!det) return { ok: false, error: "Not a recognized profile URL" };
-        const profile: Profile = { platform: det.platform, profileId: det.profileId, url: det.url, addedAt: new Date().toISOString() };
+        const profile: Profile = { platform: det.platform, profileId: det.profileId, url: det.url, addedAt: new Date().toISOString(), watchOnly: m.watchOnly };
         await storage.update("profiles", (all) => ({ ...all, [keyOf(profile)]: all[keyOf(profile)] ?? profile }));
         void runProfile(profile, false);
         return { ok: true, profileKey: keyOf(profile) };
+      }
+      case "profile:watchOnly": {
+        const m = msg as Extract<Message, { type: "profile:watchOnly" }>;
+        await storage.update("profiles", (all) => (all[m.profileKey] ? { ...all, [m.profileKey]: { ...all[m.profileKey]!, watchOnly: m.watchOnly } } : all));
+        return { ok: true };
       }
       case "profile:remove": {
         const m = msg as Extract<Message, { type: "profile:remove" }>;

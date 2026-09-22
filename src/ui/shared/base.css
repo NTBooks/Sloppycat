@@ -349,6 +349,45 @@ tbody tr:hover {
   color: var(--ok);
 }
 
+/*
+ * Indeterminate progress. A page render takes as long as the platform takes, and there is no
+ * percentage to report honestly, so the bar says "still going" and the caller says how long for.
+ */
+.progress {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: #0b0e10;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.progress span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  background: linear-gradient(90deg, transparent, var(--accent) 45%, var(--accent) 55%, transparent);
+  animation: sweep 1.2s ease-in-out infinite;
+}
+@keyframes sweep {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(350%);
+  }
+}
+/* Movement is the message here, so without it the bar just sits there lit. */
+@media (prefers-reduced-motion: reduce) {
+  .progress span {
+    animation: none;
+    width: 100%;
+    opacity: 0.45;
+    background: var(--accent);
+  }
+}
+
 .toggle {
   width: 15px;
   height: 15px;

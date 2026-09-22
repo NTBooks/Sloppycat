@@ -19,6 +19,7 @@ const moduleEntries = {
   "ui/alert/index": "src/ui/alert/index.tsx",
   "ui/scan/index": "src/ui/scan/index.tsx",
   "ui/changes/index": "src/ui/changes/index.tsx",
+  "ui/following/index": "src/ui/following/index.tsx",
   "offscreen/index": "src/offscreen/index.ts",
 };
 // Content scripts are classic scripts, not modules.
@@ -48,7 +49,7 @@ const ctxs = [
 
 function copyStatic() {
   cpSync(resolve(root, "manifest.json"), resolve(dist, "manifest.json"));
-  for (const page of ["onboard", "popup", "options", "alert", "scan", "changes"]) {
+  for (const page of ["onboard", "popup", "options", "alert", "scan", "changes", "following"]) {
     cpSync(resolve(root, `src/ui/${page}/index.html`), resolve(dist, `ui/${page}/index.html`));
   }
   cpSync(resolve(root, "src/offscreen/index.html"), resolve(dist, "offscreen/index.html"));
