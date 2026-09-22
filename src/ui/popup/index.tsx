@@ -1,7 +1,7 @@
 import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { Button } from "../shared/components";
-import { useStorage } from "../shared/hooks";
+import { Button, RunPanel } from "../shared/components";
+import { useRun, useStorage } from "../shared/hooks";
 import { send } from "../shared/rpc";
 import { detectProfile } from "../../adapters";
 import { PLATFORM_LABEL, type Platform } from "../../types";
@@ -11,6 +11,7 @@ function Popup() {
   const [profiles] = useStorage("profiles");
   const [alerts] = useStorage("alerts");
   const [changes] = useStorage("listChanges");
+  const run = useRun();
   const [tab, setTab] = useState<chrome.tabs.Tab | null>(null);
   const [detected, setDetected] = useState<{ platform: Platform; profileId: string; url: string } | null>(null);
 
@@ -92,13 +93,18 @@ function Popup() {
           Lists{unseen ? ` (${unseen})` : ""}
         </Button>
         <Button onClick={() => void chrome.runtime.openOptionsPage()}>Settings</Button>
-        <Button onClick={() => void send({ type: "run:now" })} disabled={!nProfiles} title="Check all watched profiles now">
-          Check now
+        <Button
+          onClick={() => void send({ type: "run:now" })}
+          disabled={!nProfiles || run.running}
+          title={run.running ? "A check is already running" : "Check all watched profiles now"}
+        >
+          {run.running ? "Checking…" : "Check now"}
         </Button>
         {settings?.experiments.slopscan && (
           <Button onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/scan/index.html") })}>Slopscan</Button>
         )}
       </div>
+      <RunPanel run={run} compact />
       <div class="muted" style="font-size:11px">
         Monitoring runs while Chrome is open. Blocker features are experimental and work in the web client only.
       </div>

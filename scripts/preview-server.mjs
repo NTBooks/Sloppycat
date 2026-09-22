@@ -27,6 +27,10 @@ const store = {
     { url: "https://example.com/broken.md", enabled: false, title: undefined, error: "line 12: Unknown platform \\"kindle\\"" }
   ],
   listCache: {},
+  // Null so screenshots show the resting state. Swap in the commented object to render the progress
+  // lines in the popup and in Settings:
+  // { startedAt: new Date().toISOString(), queue: ["spotify:3yY2gUcIsjMr8hjo51PoJ8", "amazon:www.amazon.com|B001IGFHW6"], done: 1, currentKey: "amazon:www.amazon.com|B001IGFHW6", currentLabel: "Jane Doe", phase: "Reading Amazon Books" }
+  runState: null,
   listChanges: [
     { id: "c1", at: "2026-09-22T12:00:00Z", source: "https://gist.githubusercontent.com/thesmiths/abc/raw", listTitle: "The Smiths — verified catalog", listType: "creator", kind: "verified", platform: "spotify", itemId: "06Ey2y54V4aGjP5EsovA2O", title: "Rank", creatorProfile: "https://open.spotify.com/artist/3yY2gUcIsjMr8hjo51PoJ8", disclosure: { vocals: "human", instruments: "human" }, seen: false },
     { id: "c2", at: "2026-09-22T12:00:00Z", source: "https://gist.githubusercontent.com/thesmiths/abc/raw", listTitle: "The Smiths — verified catalog", listType: "creator", kind: "flagged", platform: "spotify", itemId: "9xYcdefghijklmnopqrstu", title: "Midnight Jazz Vibes", creatorProfile: "https://open.spotify.com/artist/3yY2gUcIsjMr8hjo51PoJ8", note: "uploaded through 8412 Records DK, reported 22 Sep", seen: false },

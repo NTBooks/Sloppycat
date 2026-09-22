@@ -416,3 +416,15 @@ details summary:hover {
   font-weight: 700;
   letter-spacing: -0.01em;
 }
+
+/* Running commentary on a check. */
+.run-panel { display: flex; flex-direction: column; gap: 6px; }
+.run-head { display: flex; align-items: center; gap: 8px; }
+.run-warn { font-size: 11px; line-height: 1.45; }
+.run-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent, #e8a33d); animation: run-pulse 1.1s ease-in-out infinite; flex: none; }
+@keyframes run-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+.run-log { max-height: 190px; overflow-y: auto; font-size: 11px; line-height: 1.6; font-variant-numeric: tabular-nums; }
+.run-line { display: flex; gap: 8px; }
+.run-line.bad { color: var(--bad); }
+.run-time { color: var(--muted); flex: none; }
+@media (prefers-reduced-motion: reduce) { .run-dot { animation: none; opacity: 0.8; } }

@@ -57,6 +57,58 @@ export interface Snapshot {
   counts?: Record<string, number>;
 }
 
+/**
+ * What the run loop is doing, so a click on "Check now" visibly does something. Lives in storage
+ * rather than memory because the page asking is not the worker doing the work, and Chrome may
+ * restart that worker mid-run.
+ */
+export interface RunLogEntry {
+  at: string;
+  text: string;
+  /** Marks the lines worth colouring: something went wrong, or the user stopped it. */
+  bad?: boolean;
+}
+
+/** Enough log to explain the run without turning the popup into a scrollback buffer. */
+export const MAX_RUN_LOG = 50;
+
+export interface RunState {
+  startedAt: string;
+  /** Profile keys this run will visit, in order. */
+  queue: string[];
+  /** How many of them are finished. */
+  done: number;
+  /** The profile being checked right now, and what is happening to it. */
+  currentKey?: string;
+  currentLabel?: string;
+  phase?: string;
+  /** Bumped on every step, so a long run stays live and a dead one does not. */
+  beatAt?: string;
+  /**
+   * What the check has done so far, newest last. This is the whole point of the status panel: a
+   * window opening with no explanation gets closed, and a running commentary is the explanation.
+   */
+  log: RunLogEntry[];
+  /** Set when the run ends, whether it finished or was interrupted. */
+  endedAt?: string;
+}
+
+/**
+ * How long a run may go without progress before it is treated as over. Measured from the last step,
+ * not from the start: a big catalogue legitimately takes a while, and timing a real run out would
+ * mean the UI contradicting the worker. The worker can be killed mid-run without getting to write
+ * endedAt, and a Check button stuck on "Checking..." forever is worse than one that recovers late.
+ *
+ * The worst honest gap between steps is one profile: an Amazon snapshot, its bio page and a
+ * lookalike search, each of which can take the better part of a minute.
+ */
+export const RUN_STALE_MS = 5 * 60 * 1000;
+
+export function isRunning(r: RunState | null | undefined): boolean {
+  if (!r || r.endedAt) return false;
+  return Date.now() - Date.parse(r.beatAt ?? r.startedAt) < RUN_STALE_MS;
+}
+
 export type Signal =
   | { kind: "first_time_label"; label: string; knownLabels: string[] }
   | { kind: "distributor_placeholder"; label: string }

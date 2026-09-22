@@ -34,6 +34,16 @@ Three things address it:
 **It only runs while your browser is open.** An extension has no other option. A hosted version would fix it,
 and the JSON adapters would move to a server unchanged.
 
+**Spotify and Amazon are read in a real page, and you may see the window.** Spotify's catalogue arrives in the
+GraphQL calls the player makes with a token minted per page load, and Amazon's author store is JavaScript
+rendered against your own session. Neither can be put in an invisible frame: Amazon sends
+`X-Frame-Options: SAMEORIGIN` and Spotify's CSP sets `frame-ancestors 'self'`, so an offscreen document is not
+an option and a page is the only thing left. It is one reused tab in one minimized window of its own, never a
+tab in a window you are working in, and it closes when the check finishes. Apple Music, Deezer, Google Books
+and Goodreads need none of this and are fetched directly. If you close the window mid-check, the check says so
+and tries again next time. There is also a ceiling on page loads per check, so a bug upstream stops rather than
+opening pages in a stream.
+
 **Claims can only be self-proved where a creator controls a bio.** Spotify for Artists, Amazon Author Central
 and a claimed Goodreads profile qualify. Apple Music, Deezer and Google Books give a creator nowhere to put
 the link, so a claim there rests on registry attestation instead. See [trust.md](trust.md).

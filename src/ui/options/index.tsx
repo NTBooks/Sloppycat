@@ -1,8 +1,8 @@
 import type preact from "preact";
 import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { Button, Chip, CopyButton, Empty } from "../shared/components";
-import { useStorage } from "../shared/hooks";
+import { Button, Chip, CopyButton, Empty, RunPanel } from "../shared/components";
+import { useRun, useStorage } from "../shared/hooks";
 import { download, fmtDate, send } from "../shared/rpc";
 import { PLATFORM_LABEL } from "../../types";
 import { adapterFor } from "../../adapters";
@@ -17,6 +17,7 @@ function Profiles() {
   const [profiles] = useStorage("profiles");
   const [url, setUrl] = useState("");
   const [err, setErr] = useState("");
+  const run = useRun();
   const list = Object.entries(profiles ?? {});
   return (
     <section class="card stack">
@@ -37,6 +38,7 @@ function Profiles() {
         </Button>
       </form>
       {err && <div class="notice bad">{err}</div>}
+      <RunPanel run={run} />
       {list.length === 0 ? (
         <Empty>No profiles yet. Add one above, or use the popup on your own profile page.</Empty>
       ) : (
@@ -62,6 +64,13 @@ function Profiles() {
                 </td>
                 <td>
                   {p.verified ? <Chip tone="ok">Verified</Chip> : adapterFor(p.platform).supportsBio ? <Chip>Unclaimed</Chip> : <Chip>No bio on this platform</Chip>}
+                  {adapterFor(p.platform).supportsBio && (
+                    <div class="muted" style="font-size:12px">
+                      {p.verified
+                        ? "Your list link is in the bio and names this profile."
+                        : "Looked for your list link on the last check. Add it to the bio and it will be picked up on the next one."}
+                    </div>
+                  )}
                   {p.lastError && (
                     <div class="muted" style="font-size:12px;color:var(--bad)">
                       {p.lastError}
@@ -70,17 +79,13 @@ function Profiles() {
                 </td>
                 <td class="when">{fmtDate(p.lastRunAt)}</td>
                 <td class="row" style="justify-content:flex-end">
-                  <Button onClick={() => void send({ type: "run:now", profileKey: key })}>Check</Button>
-                  {adapterFor(p.platform).supportsBio && (
-                    <Button
-                      onClick={async () => {
-                        const r = await send<{ ok: boolean; reason?: string }>({ type: "verify:profile", profileKey: key });
-                        alert(r.ok ? "Verified." : (r.reason ?? "Not verified"));
-                      }}
-                    >
-                      Verify
-                    </Button>
-                  )}
+                  <Button
+                    onClick={() => void send({ type: "run:now", profileKey: key })}
+                    disabled={run.running}
+                    title={run.running ? "A check is already running" : "Check this profile now"}
+                  >
+                    {run.running && run.currentKey === key ? "Checking…" : "Check"}
+                  </Button>
                   <Button kind="danger" onClick={() => void send({ type: "profile:remove", profileKey: key })}>
                     Remove
                   </Button>

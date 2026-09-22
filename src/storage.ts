@@ -1,5 +1,5 @@
 // Thin typed wrapper over chrome.storage.local.
-import type { Alert, ListChange, ListDocument, ListSource, Platform, Profile, Settings, Snapshot } from "./types";
+import type { Alert, ListChange, ListDocument, ListSource, Platform, Profile, RunState, Settings, Snapshot } from "./types";
 import type { Claim } from "./lists/claims";
 import { DEFAULT_SETTINGS } from "./types";
 
@@ -23,6 +23,8 @@ export interface Schema {
   /** The creator's own list, kept locally so decisions survive before publishing. */
   myList: ListDocument | null;
   runCounter: number;
+  /** Progress of the check currently running, for the popup and settings to show. */
+  runState: RunState | null;
 }
 
 const DEFAULTS: Schema = {
@@ -36,6 +38,7 @@ const DEFAULTS: Schema = {
   claims: {},
   myList: null,
   runCounter: 0,
+  runState: null,
 };
 
 export async function get<K extends keyof Schema>(key: K): Promise<Schema[K]> {
