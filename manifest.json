@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Sloppycat",
   "version": "0.1.0",
-  "description": "Artists verify their catalogs; fans see it. Alerts creators when fake releases appear on their profiles and flags them for everyone else.",
+  "description": "Watches your artist or author profiles for releases you did not publish, writes the takedown, and marks fakes for listeners.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

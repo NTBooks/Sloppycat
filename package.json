@@ -11,7 +11,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "preview": "node scripts/preview-server.mjs",
-    "package": "node scripts/package.mjs"
+    "package": "node scripts/check-store.mjs && node scripts/package.mjs",
+    "check:store": "node scripts/check-store.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.290",

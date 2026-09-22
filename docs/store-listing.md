@@ -16,10 +16,10 @@ platform's takedown form, and marking items from lists creators publish. There i
 
 **Name:** Sloppycat
 
-**Summary (132 characters max):**
+**Summary.** The store caps this at 132 characters and it must match the `description` field in
+manifest.json, which has the same limit. Currently 124 characters:
 
-> Watches your artist or author profiles for releases you didn't publish, writes the takedown, and marks
-> fakes for listeners.
+> Watches your artist or author profiles for releases you did not publish, writes the takedown, and marks fakes for listeners.
 
 **Category:** Productivity
 
@@ -125,4 +125,5 @@ approval.
 1. `npm test` and `npm run build`
 2. `npm run package`, which zips `dist/` with the manifest at the root of the archive
 3. Bump `version` in `manifest.json`. The store rejects a re-upload at the same version.
-4. Check this file still matches the manifest's permissions.
+4. Check this file still matches the manifest's permissions and description.
+5. `npm run check:store` verifies the description length before you waste an upload on it.
