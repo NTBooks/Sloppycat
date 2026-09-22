@@ -21,29 +21,56 @@ manifest.json, which has the same limit. Currently 124 characters:
 
 > Watches your artist or author profiles for releases you did not publish, writes the takedown, and marks fakes for listeners.
 
-**Category:** Productivity
+**Category:** Productivity, then Tools. (Workflow & Planning also fits if the dropdown offers it. The
+category groups are Productivity, Lifestyle and Make Chrome Yours.)
 
-**Description:**
+**Language:** English (United States)
 
-> Someone uploads an AI-generated track through a cheap distributor, claims it's yours, and it lands on your
-> artist page next to your real records. The royalties go to them. Your fans think it's you. The same thing
-> happens to authors: your name on a book you didn't write, or a title one word off yours.
->
-> Sloppycat snapshots your own profiles on Spotify, Apple Music, Deezer, Amazon and Goodreads. You untick
-> anything that isn't yours, and it hands you the takedown letter for each one: the right form for that
-> platform, with your links and the release id already filled in. Then it watches those profiles on a timer
-> and tells you when something new turns up.
->
-> It is not an AI detector. A fake on your page is credited to a human, so detection misses it entirely. The
-> only person who knows whether a release is yours is you, so yours is the word it carries.
->
-> Creators can publish what they confirmed as a plain Markdown list. Other people can subscribe to those
-> lists, the way you subscribe to filter lists in an ad blocker, and see disowned items marked on the page.
-> Those blocker features are experimental and switched off until you turn them on, and they only work in the
-> web client.
->
-> No account, no server, no telemetry. Everything stays in your browser. Open source, MIT licensed:
-> https://github.com/NTBooks/Sloppycat
+**Description** (16,000 character limit, currently 3154):
+
+```
+Someone uploads an AI-generated track through a cheap distributor, claims it is yours, and it lands on your artist page next to your real records. The royalties go to them. Your fans think it is you. The same thing happens to authors: your name on a book you did not write, or a title one word off yours.
+
+Sloppycat watches for it.
+
+WHAT IT DOES
+
+Snapshot your own profile on Spotify, Apple Music, Deezer, Amazon or Goodreads. It reads what is on the page the same way anyone else's browser would. Everything starts ticked as yours and you untick what is not. Nothing is unticked for you, because a guess about your own catalog is worse than no guess.
+
+Everything you untick comes with the takedown letter already written: the right form for that platform, the steps in the order the platform wants them, and your links and the release id filled in. You copy it and send it.
+
+Then it keeps checking on a timer, hourly by default, and tells you when something new turns up that you have not claimed. It also looks for near-copies of your titles listed elsewhere under a made-up name, which is the half of this you cannot catch by watching your own page.
+
+IT IS NOT AN AI DETECTOR
+
+Spotify and Deezer already badge AI-generated music, and it misses this entirely: a fake on your page is credited to a human, so nothing flags it. The only person who knows whether a release is yours is you. So yours is the word it carries.
+
+FOR EVERYONE ELSE
+
+Creators can publish what they confirmed as a plain Markdown list, anywhere with a URL. Other people subscribe to those lists the way you subscribe to filter lists in an ad blocker, and disowned items get marked on the page before you press play or buy a copy. Hovering a mark tells you who said what and when, including which parts of a record were made with AI if the artist said so.
+
+Those blocker features are experimental, switched off until you turn them on, and they only work in the web client.
+
+HOW A LIST IS TRUSTED
+
+Anyone can write a file claiming your catalog. So the proof is not in the file. You paste your list's address into a bio only you can edit, in Spotify for Artists or Amazon Author Central, and the list names that profile back. Both directions have to match, and only you can do the second half. Every copy of the extension checks that for itself before it shows a mark, and an unproven claim shows nothing at all.
+
+PRIVACY
+
+No account, no server, no analytics, no telemetry. Everything stays in your browser, and the extension never reports the pages you visit to anyone. Requests go to the platforms you asked it to watch and to the lists you subscribed to, and nowhere else.
+
+HONEST LIMITS
+
+It only runs while your browser is open. It writes the takedown, you send it. Blocker features are web client only, so not the desktop app and not your phone. Spotify only hands over your ten newest albums and singles, so the extension pages past that where it can and watches the release counts to catch what hides behind an old release date.
+
+Open source, MIT licensed, and the research behind every design decision is in the repository with its sources: https://github.com/NTBooks/Sloppycat
+```
+
+**Official URL:** https://ntbooks.github.io/Sloppycat/site/
+
+**Support URL:** https://github.com/NTBooks/Sloppycat/issues
+
+**Mature content:** no.
 
 ## Permission justifications
 
