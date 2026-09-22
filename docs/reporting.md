@@ -8,20 +8,15 @@ easiest thing in the system to abuse, so where it lives and what it's allowed to
 Keep the assertions on GitHub, put reports in a small Cloudflare Worker with its own D1, publish an aggregated
 snapshot back to GitHub on a cron, and never let a report become a verdict.
 
-## Don't merge this into that other project
+## Keep it its own thing
 
-Same Cloudflare account, same free tier, same deploy habits. Different product, different brand, separate
-Worker, separate D1, separate domain.
+Whatever else you run, this should be a separate product: its own name, its own worker, its own database, its
+own domain. Sharing a hosting account is fine and costs nothing extra. Sharing a brand is not.
 
 The reason is the pitch. Getting labels, managers and music lawyers to publish lists depends on this looking
-like neutral infrastructure. that other project is a tongue-in-cheek leaderboard where being listed is the joke and the
-tagline invites people to submit slop. That tone is right for its audience and wrong for a rights holder
-deciding whether to put their roster's verification behind it. The audiences are opposites too: that other project's
-users opt in to be listed, Sloppycat's users are people something was done to.
-
-Cross-linking is fine. Shared code patterns are fine, and there are several worth lifting: the moderation
-console, weighted votes, the read-through cache, the public queue and stats pages. Copy the patterns, not the
-repo.
+like neutral infrastructure that nobody profits from. Anything that reads as a side feature of a bigger
+project, or as a bit of fun, gives a rights holder a reason to pass. The audience is different too: the people
+this serves are people something was done to.
 
 ## Two kinds of data, two different homes
 
@@ -40,8 +35,8 @@ repo.
    people who haven't installed anything. Payload is the platform, the item id, any identifier the page shows
    (ISBN, UPC), and an optional reason. No page-view telemetry, ever: the extension only talks to the endpoint
    when a person presses the button.
-2. **The Worker stores it,** rate-limited per IP hash, with Turnstile on the web form. Weighting mirrors
-   that other project's: anonymous counts for something, a GitHub-authenticated report counts for more. A verified
+2. **The Worker stores it,** rate-limited per IP hash, with Turnstile on the web form. Weighting is
+   the usual shape: anonymous counts for something, a GitHub-authenticated report counts for more. A verified
    creator reporting their own profile doesn't go in this pile at all; that belongs in their list.
 3. **A cron aggregates** and publishes a snapshot to the registry repo: items at or above a threshold, with
    counts and first-seen dates, as a normal community list with a `## Reported` section.
@@ -73,8 +68,8 @@ per-view API calls from every installed extension, which is exactly what the sna
 
 ## To decide
 
-- A domain for the reporting endpoint and the site. Own domain, separate from your other site, for the
-  neutrality reason above.
+- A domain for the reporting endpoint and the site, separate from anything else you run, for the neutrality
+  reason above.
 - Whether GitHub login is offered from day one for weighted reports, or added once volume justifies it.
 - Privacy and terms pages before the endpoint accepts anything, covering what a report stores and how a
   creator gets something about them removed.
