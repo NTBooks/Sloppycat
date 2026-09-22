@@ -36,6 +36,11 @@ const store = {
   runCounter: 3
 };
 const listeners = [];
+// The list hosts the real manifest requires, and the optional grants on top of them. Seeded so the
+// example.com source in listSources renders the "Allow that host" row the real options page shows.
+const required = ["https://raw.githubusercontent.com/*", "https://gist.githubusercontent.com/*", "https://gist.github.com/*", "https://github.com/*", "https://api.github.com/*"];
+const granted = new Set(required);
+const permListeners = { added: [], removed: [] };
 window.chrome = {
   runtime: {
     id: "stub",
@@ -54,7 +59,25 @@ window.chrome = {
       return { ok: true, verdicts: {}, reason: "stub: " + m.type };
     },
     openOptionsPage: () => location.assign("/ui/options/index.html"),
+    getManifest: () => ({ host_permissions: [...required] }),
     onMessage: { addListener() {}, removeListener() {} }
+  },
+  permissions: {
+    getAll: async () => ({ permissions: [], origins: [...granted] }),
+    contains: async ({ origins = [] }) => origins.every((o) => granted.has(o)),
+    request: async ({ origins = [] }) => {
+      if (!confirm("Stub permission prompt: allow " + origins.join(", ") + "?")) return false;
+      origins.forEach((o) => granted.add(o));
+      permListeners.added.forEach((f) => f({ origins }));
+      return true;
+    },
+    remove: async ({ origins = [] }) => {
+      origins.forEach((o) => granted.delete(o));
+      permListeners.removed.forEach((f) => f({ origins }));
+      return true;
+    },
+    onAdded: { addListener: (f) => permListeners.added.push(f), removeListener: (f) => permListeners.added.splice(permListeners.added.indexOf(f), 1) },
+    onRemoved: { addListener: (f) => permListeners.removed.push(f), removeListener: (f) => permListeners.removed.splice(permListeners.removed.indexOf(f), 1) }
   },
   storage: {
     local: {

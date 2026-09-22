@@ -60,6 +60,11 @@ cached on your computer.
   `api-partner.spotify.com` — the platforms whose catalogs it reads; and `raw.githubusercontent.com`,
   `gist.githubusercontent.com`, `gist.github.com`, `api.github.com`, `github.com` — where lists are fetched
   from and, at your request, published to.
+- **optional host permissions**, asked for one host at a time and only when you add a list that lives
+  somewhere other than GitHub. Chrome shows you the host and you can say no; the list is simply not
+  fetched. Granted hosts are used for one thing, reading that Markdown file, and the extension hands a
+  host back automatically when you remove the last list on it. You can also revoke any of them yourself
+  from Chrome's extension settings, and nothing else in the extension stops working when you do.
 
 ## Children
 

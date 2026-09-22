@@ -37,6 +37,9 @@
     "https://api.github.com/*",
     "https://github.com/*"
   ],
+  "optional_host_permissions": [
+    "https://*/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"

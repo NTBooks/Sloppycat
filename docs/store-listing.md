@@ -96,6 +96,12 @@ Paste each into the matching box. Keep them literal; a reviewer checks them agai
 - **Host permissions** — Reads the public catalog pages of the platforms the user watches
   (Spotify, Apple Music, Deezer, Amazon, Goodreads, Google Books, Open Library), and fetches the lists the
   user subscribed to from GitHub, publishing the user's own list there at their request.
+- **Optional host permissions (`https://*/*`)** — A list is a Markdown file the creator hosts themselves,
+  and not every creator uses GitHub. The extension never fetches an arbitrary host on its own: when the
+  user pastes a list URL outside the GitHub hosts above, the page calls `chrome.permissions.request` for
+  that single origin, from the user's own click, and Chrome names the host in its own dialog. Declining
+  leaves the list unfetched and nothing else changes. Removing the last list on a host revokes the grant
+  again. Nothing is requested at install time, so the install prompt covers only the required hosts above.
 
 **Remote code:** none. All code ships in the package. The extension fetches Markdown lists, which are data,
 never executed.
@@ -153,10 +159,17 @@ Review applies to all three, including unlisted. An extension with this many hos
 draw a slower, closer look than a trivial one, so submit early and expect questions rather than a same-day
 approval.
 
+The likeliest question is the optional `https://*/*`. The answer is above and it is worth having ready: it
+is optional, it is never requested at install, every request is one origin the user just typed, and the
+only thing granted hosts are used for is fetching that one Markdown file. The alternative would be telling
+creators their list has to live on GitHub, which is a worse product and would still not shrink the install
+prompt, because nothing here is added to it.
+
 ## Before each submission
 
 1. `npm test` and `npm run build`
 2. `npm run package`, which zips `dist/` with the manifest at the root of the archive
 3. Bump `version` in `manifest.json`. The store rejects a re-upload at the same version.
-4. Check this file still matches the manifest's permissions and description.
+4. Check this file still matches the manifest's permissions and description, `optional_host_permissions`
+   included, and that [privacy.md](privacy.md) and [privacy.html](privacy.html) still say the same thing.
 5. `npm run check:store` verifies the description length before you waste an upload on it.

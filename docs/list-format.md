@@ -112,7 +112,10 @@ Unknown keys and values are preserved and displayed verbatim, so the vocabulary 
 
 ## Publishing and claiming
 
-1. Publish the file at any URL the extension can fetch: a GitHub Gist raw URL, a repo raw URL, your own site.
+1. Publish the file at any https URL: a GitHub Gist raw URL, a repo raw URL, your own site. GitHub and Gist
+   are in the extension's manifest, so a list there is fetched with no prompt; on any other host Chrome asks
+   each subscriber once, naming that host, when they add your list. It has to be https, because a list served
+   over plain http could be rewritten in transit by anyone on the path.
 2. Put that URL in a bio only you can edit: Spotify for Artists, Amazon Author Central, or a claimed
    Goodreads profile. The extension reads the bio, fetches the list, and checks that the list's
    `## Creator` table names that same profile. Both directions must match, which is what makes the claim

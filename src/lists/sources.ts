@@ -5,6 +5,7 @@ import * as storage from "../storage";
 import type { CachedList } from "../storage";
 import { expiresToMs, parseList } from "./format";
 import { normalizeListUrl } from "../adapters/shared";
+import { accessErrorFor, hasListAccess, listUrlProblem, releaseUnusedListAccess } from "./permissions";
 import { attestations, claimsThisProfile, isCorroborated, routeFor, type ListRoute } from "./claims";
 import { forgetSource, recordChanges } from "./changes";
 
@@ -37,8 +38,15 @@ export async function ensureDefaultSources(): Promise<void> {
   }
 }
 
+/**
+ * Subscribe to a list. The caller is responsible for host access: a list outside the GitHub hosts in
+ * the manifest needs `requestListAccess` first, from a user gesture in a page. Called without it the
+ * source is still added, and shows the missing-permission error rather than a bare CORS failure.
+ */
 export async function addSource(url: string): Promise<ListSource> {
   const norm = normalizeListUrl(url);
+  const problem = listUrlProblem(norm);
+  if (problem) throw new Error(problem);
   const sources = await storage.get("listSources");
   let src = sources.find((s) => s.url === norm);
   if (!src) {
@@ -52,6 +60,10 @@ export async function addSource(url: string): Promise<ListSource> {
 
 export async function removeSource(url: string): Promise<void> {
   await storage.update("listSources", (s) => s.filter((x) => x.url !== url || x.builtin));
+  // Hand back any host access that only this list needed. Nothing else asks for these hosts.
+  const settings = await storage.get("settings");
+  const left = await storage.get("listSources");
+  await releaseUnusedListAccess([...left.map((s) => s.url), settings.myListUrl]);
   // Dropping a list drops everything it ever said, the changelog included.
   await forgetSource(url);
   await storage.update("listCache", (c) => {
@@ -78,6 +90,11 @@ export async function refreshSource(url: string, force = false): Promise<ListCha
   if (!force && cached) {
     const ttl = expiresToMs(cached.doc.expires);
     if (Date.now() - Date.parse(cached.fetchedAt) < ttl) return [];
+  }
+  // Without host access the fetch fails as an opaque network error, so say what is actually wrong.
+  if (!(await hasListAccess(url))) {
+    await storage.update("listSources", (s) => s.map((x) => (x.url === url ? { ...x, error: accessErrorFor(url) } : x)));
+    return [];
   }
   const patch: Partial<ListSource> = {};
   let changes: ListChange[] = [];

@@ -1,13 +1,14 @@
 import type preact from "preact";
 import { render } from "preact";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { Button, Chip, CopyButton, Empty } from "../shared/components";
 import { useStorage } from "../shared/hooks";
 import { download, fmtDate, send } from "../shared/rpc";
 import { PLATFORM_LABEL } from "../../types";
 import { adapterFor } from "../../adapters";
 import { serializeList, parseDisclosure, serializeDisclosure } from "../../lists/format";
-import { addSource, removeSource, setSourceEnabled } from "../../lists/sources";
+import { addSource, refreshSource, removeSource, setSourceEnabled } from "../../lists/sources";
+import { hasListAccess, hostOf, listUrlProblem, requestListAccess } from "../../lists/permissions";
 import { toUblockFilters } from "../../lists/export-ublock";
 import * as storage from "../../storage";
 import { GITHUB_CLIENT_ID, startDeviceFlow, pollDeviceFlow, upsertGist } from "../../github";
@@ -351,6 +352,39 @@ function Testing() {
   );
 }
 
+/**
+ * Which subscribed lists the extension can actually fetch. A list on a host outside the manifest
+ * needs an optional permission, and the user can take it back from Chrome's own settings at any
+ * time, so this is re-read rather than assumed.
+ */
+function useListAccess(sources: { url: string }[] | undefined) {
+  const [blocked, setBlocked] = useState<string[]>([]);
+  const [tick, setTick] = useState(0);
+  // URLs never contain a space, so one string of them is a safe dependency key.
+  const key = (sources ?? []).map((s) => s.url).join(" ");
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const out: string[] = [];
+      for (const u of key ? key.split(" ") : []) if (!(await hasListAccess(u))) out.push(u);
+      if (live) setBlocked(out);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [key, tick]);
+  useEffect(() => {
+    const recheck = () => setTick((t) => t + 1);
+    chrome.permissions.onAdded.addListener(recheck);
+    chrome.permissions.onRemoved.addListener(recheck);
+    return () => {
+      chrome.permissions.onAdded.removeListener(recheck);
+      chrome.permissions.onRemoved.removeListener(recheck);
+    };
+  }, []);
+  return blocked;
+}
+
 function Sources() {
   const [sources] = useStorage("listSources");
   const [cache] = useStorage("listCache");
@@ -358,25 +392,46 @@ function Sources() {
   const unseen = (changes ?? []).filter((c) => !c.seen).length;
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const blocked = useListAccess(sources);
   const all = Object.values(cache ?? {}).map((c) => c.doc);
   return (
     <section class="card stack">
       <h2>List sources</h2>
       <p class="muted">
-        Like an ad blocker's filter lists. Add any raw URL to a Sloppycat list: a creator's Gist, a community list, your own.
+        Like an ad blocker's filter lists. Add any https URL to a Sloppycat list: a creator's Gist, a community list, your own.
+        Lists on GitHub and Gist work straight away; for any other host Chrome asks you once whether Sloppycat may read it.
       </p>
       <form
         class="row"
         onSubmit={async (e) => {
           e.preventDefault();
-          if (!url.trim()) return;
+          const raw = url.trim();
+          if (!raw) return;
+          setErr("");
+          const problem = listUrlProblem(raw);
+          if (problem) {
+            setErr(problem);
+            return;
+          }
+          // Ask Chrome first, while the submit is still a user gesture. A GitHub host returns true
+          // without a prompt; anywhere else this is the dialog naming the one host being granted.
+          const granted = await requestListAccess(raw);
+          if (!granted) {
+            setErr(`Sloppycat needs your permission to read ${hostOf(raw)} before it can fetch that list.`);
+            return;
+          }
           setBusy(true);
-          await addSource(url.trim());
-          setUrl("");
+          try {
+            await addSource(raw);
+            setUrl("");
+          } catch (e) {
+            setErr(e instanceof Error ? e.message : String(e));
+          }
           setBusy(false);
         }}
       >
-        <input type="url" placeholder="https://gist.githubusercontent.com/…/raw or https://raw.githubusercontent.com/…/sloppycat.md" value={url} onInput={(e) => setUrl((e.target as HTMLInputElement).value)} style="flex:1" />
+        <input type="url" placeholder="https://gist.githubusercontent.com/…/raw or https://your-site.example/sloppycat.md" value={url} onInput={(e) => setUrl((e.target as HTMLInputElement).value)} style="flex:1" />
         <Button type="submit" kind="primary" disabled={busy}>
           Add
         </Button>
@@ -385,6 +440,7 @@ function Sources() {
           What changed{unseen ? ` (${unseen})` : ""}
         </Button>
       </form>
+      {err && <div class="notice bad">{err}</div>}
       <table>
         <thead>
           <tr>
@@ -411,6 +467,18 @@ function Sources() {
                 </div>
                 {s.error && (
                   <div style="font-size:12px;color:var(--bad)">{s.error}</div>
+                )}
+                {blocked.includes(s.url) && (
+                  <div class="row" style="font-size:12px;margin-top:4px;align-items:center">
+                    <span style="color:var(--bad)">Sloppycat cannot read {hostOf(s.url)} until you allow it.</span>
+                    <Button
+                      onClick={async () => {
+                        if (await requestListAccess(s.url)) await refreshSource(s.url, true);
+                      }}
+                    >
+                      Allow {hostOf(s.url)}
+                    </Button>
+                  </div>
                 )}
               </td>
               <td>{s.type ?? "–"}</td>

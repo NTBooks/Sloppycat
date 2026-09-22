@@ -43,7 +43,7 @@ has nothing to say about anything.
 There is a genuinely unforgeable signal available here, and it's worth explaining, because an earlier version
 of this document made it the root and I think that was a mistake.
 
-A creator can publish their list anywhere with a URL, then paste that URL into a bio only they control.
+A creator can publish their list anywhere with an https URL, then paste that URL into a bio only they control.
 Editing the bio on a Spotify artist profile requires Spotify for Artists access for that artist. Author
 Central, same. The list names the profile, the profile names the list back, and a scammer can't write the
 second direction. It's the same trick as a DNS TXT record for domain validation, or a Keybase proof.

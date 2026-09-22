@@ -11,6 +11,7 @@ import { signalsFor } from "../../signals";
 import { mergeCreatorDoc, parseDisclosure, serializeDisclosure, serializeList } from "../../lists/format";
 import { buildPacket, packetAsText } from "../../remediation/packets";
 import { githubNewFileUrl } from "../../github";
+import { hostOf, isBuiltinListHost, listUrlProblem, requestListAccess } from "../../lists/permissions";
 import * as storage from "../../storage";
 
 type Step = 0 | 1 | 2 | 3 | 4;
@@ -409,7 +410,11 @@ function Wizard() {
         <div class="stack">
           <div class="card stack">
             <h2>1. Publish the list somewhere public</h2>
-            <p class="muted">Any raw URL works. GitHub Gist is easiest. The link is how fans and other Sloppycat users find your verified catalog.</p>
+            <p class="muted">
+              Any https URL works. GitHub Gist is easiest, and it is the one host every Sloppycat can already read; on your own
+              domain, each subscriber is asked once to allow that host. The link is how fans and other Sloppycat users find your
+              verified catalog.
+            </p>
             <div class="stack">
               <div class="row">
                 <CopyButton text={listText} label="Copy list" kind="primary" />
@@ -438,6 +443,12 @@ function Wizard() {
             <div class="muted" style="font-size:12px">
               For a Gist: open it, click "Raw", copy that address. Drop the commit hash from the path so it always serves the latest version.
             </div>
+            {publishedUrl.trim() && !listUrlProblem(publishedUrl.trim()) && !isBuiltinListHost(publishedUrl.trim()) && (
+              <div class="notice">
+                That is not a GitHub host, which is fine. Sloppycat will ask you to allow {hostOf(publishedUrl.trim())} when you
+                verify below, and it asks each subscriber the same thing once, when they add your list.
+              </div>
+            )}
           </div>
           <div class="card stack">
             <h2>3. Put the link in your bio to prove it's you</h2>
@@ -463,10 +474,22 @@ function Wizard() {
                 kind="primary"
                 disabled={!publishedUrl || !detected || busy === "verify" || !adapterFor(detected.platform).supportsBio}
                 onClick={async () => {
+                  const listUrl = publishedUrl.trim();
+                  const problem = listUrlProblem(listUrl);
+                  if (problem) {
+                    setVerifyMsg(problem);
+                    return;
+                  }
+                  // Checking the claim means fetching your own list. On a host outside GitHub that
+                  // needs a grant, and this click is the gesture Chrome requires to ask for one.
+                  if (!(await requestListAccess(listUrl))) {
+                    setVerifyMsg(`Sloppycat needs your permission to read ${hostOf(listUrl)} before it can check the claim.`);
+                    return;
+                  }
                   setBusy("verify");
                   setVerifyMsg("");
                   try {
-                    if (settings) await setSettings({ ...settings, myListUrl: publishedUrl.trim() });
+                    if (settings) await setSettings({ ...settings, myListUrl: listUrl });
                     const r = await send<{ ok: boolean; reason?: string }>({ type: "verify:profile", profileKey: `${detected!.platform}:${detected!.profileId}` });
                     setVerifyMsg(r.ok ? "Verified. Your profile now shows as claimed." : (r.reason ?? "Not verified yet."));
                   } finally {

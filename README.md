@@ -148,8 +148,9 @@ Type: creator
 The wizard writes this for you at the end of the snapshot. Copy it, or download it, or let it open GitHub
 with the file already filled in.
 
-**Publish it** anywhere with a plain URL. A public Gist is the least work. The raw URL is what people
-subscribe to. The file the wizard writes opens with a comment saying what it is, where to get the
+**Publish it** anywhere with a plain https URL. A public Gist is the least work, and it's the one host every
+copy of the extension can already read; on your own domain, Chrome asks each subscriber once to allow that
+host when they add your list. The raw URL is what people subscribe to. The file the wizard writes opens with a comment saying what it is, where to get the
 extension, and how to add the list, because someone following the link from your bio lands on raw Markdown
 with nothing else to go on. It's a comment, so it stays out of the way of anyone who already knows.
 

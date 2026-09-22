@@ -38,6 +38,14 @@ and the JSON adapters would move to a server unchanged.
 and a claimed Goodreads profile qualify. Apple Music, Deezer and Google Books give a creator nowhere to put
 the link, so a claim there rests on registry attestation instead. See [trust.md](trust.md).
 
+**A list off GitHub costs one permission click.** The manifest ships with the GitHub and Gist hosts, so a
+list there is fetched with no prompt. A list on a creator's own domain needs an optional host permission,
+which Chrome asks for at the moment you add that URL and not before: it names the one host, you can decline,
+and declining just means that list is never fetched. This keeps the install prompt the size it is, at the
+cost of one extra click per non-GitHub list. Removing the last list on a host gives the permission back.
+Until the host is granted, the list shows "Sloppycat has no permission to read that host" with a button to
+grant it, rather than a fetch that fails for reasons nobody can see.
+
 **Identifiers mostly aren't on the page.** ISRCs and UPCs never appear on a public streaming page, so they
 have to come from you or your distributor. ISBNs do appear on book pages and get read. ASIN churn is covered
 in [the identifier notes](../research/identifiers.md).

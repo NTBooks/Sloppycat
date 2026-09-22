@@ -2,6 +2,7 @@
 import type { ListDocument, Platform, Profile } from "../types";
 import { adapterFor, type FetchContext } from "../adapters";
 import { normalizeListUrl } from "../adapters/shared";
+import { hasListAccess, hostOf, listUrlProblem } from "./permissions";
 import { parseList } from "./format";
 import { sameProfile } from "./sources";
 import { claimedProfiles, setClaim, type Claim } from "./claims";
@@ -24,6 +25,17 @@ export async function verifyProfile(profile: Profile, bioListUrl: string | undef
   }
   if (!bioListUrl) return { ok: false, reason: "No Sloppycat list link found in the profile bio yet." };
   const url = normalizeListUrl(bioListUrl);
+  const problem = listUrlProblem(url);
+  if (problem) return { ok: false, listUrl: url, reason: problem };
+  // A bio can point anywhere. Reading a host the user never granted would fail as a network error,
+  // so name the missing grant instead: Settings can ask for it, this worker cannot.
+  if (!(await hasListAccess(url))) {
+    return {
+      ok: false,
+      listUrl: url,
+      reason: `Your list is hosted on ${hostOf(url)}, which Sloppycat has no permission to read yet. Add it under List sources in Settings and allow the host when Chrome asks.`,
+    };
+  }
   let text: string;
   try {
     const res = await fetch(url, { credentials: "omit", cache: "no-cache" });
