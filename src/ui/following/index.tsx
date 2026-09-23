@@ -7,8 +7,8 @@ import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { Button, Chip, Empty } from "../shared/components";
 import { useStorage } from "../shared/hooks";
-import { fmtDate, send } from "../shared/rpc";
-import { PLATFORM_LABEL, type Alert, type Profile, type Snapshot } from "../../types";
+import { fmtDate, fmtInterval, send } from "../shared/rpc";
+import { DEFAULT_SETTINGS, PLATFORM_LABEL, type Alert, type Profile, type Snapshot } from "../../types";
 import { normalizeListUrl } from "../../adapters/shared";
 import { hasListAccess, hostOf, requestListAccess } from "../../lists/permissions";
 import { addSource } from "../../lists/sources";
@@ -199,7 +199,7 @@ function Following() {
         <h1>Following</h1>
       </div>
       <p class="muted" style="margin:0">
-        Every page Sloppycat is watching in this browser. Checks run about every {settings?.intervalMinutes ?? 60} minutes while Chrome is
+        Every page Sloppycat is watching in this browser. Checks run about every {fmtInterval(settings?.intervalMinutes ?? DEFAULT_SETTINGS.intervalMinutes)} while Chrome is
         open, and anything new turns into an alert.
       </p>
 

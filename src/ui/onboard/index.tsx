@@ -6,9 +6,9 @@ import { render } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { Button, Chip, CopyButton, Empty, RunPanel, SignalChips } from "../shared/components";
 import { useRun, useStorage } from "../shared/hooks";
-import { download, send, openPage} from "../shared/rpc";
+import { download, fmtInterval, send, openPage } from "../shared/rpc";
 import type { ExtractResult, ItemKind, Platform, Profile, SnapshotItem } from "../../types";
-import { PLATFORM_LABEL } from "../../types";
+import { DEFAULT_SETTINGS, PLATFORM_LABEL } from "../../types";
 import { adapterFor, detectProfile } from "../../adapters";
 import { signalsFor } from "../../signals";
 import { mergeCreatorDoc, parseDisclosure, serializeDisclosure, serializeList } from "../../lists/format";
@@ -748,7 +748,7 @@ function Wizard() {
           <div class="card stack">
             <h2>Following {result?.displayName ?? detected?.profileId}</h2>
             <p>
-              Sloppycat checks this page every {settings?.intervalMinutes ?? 60} minutes while Chrome is open, and tells you when something
+              Sloppycat checks this page every {fmtInterval(settings?.intervalMinutes ?? DEFAULT_SETTINGS.intervalMinutes)} while Chrome is open, and tells you when something
               new appears on it: a first-time label, a release dated into the back catalog, a title that shadows one already there.
             </p>
             <p class="muted">
@@ -837,7 +837,7 @@ function Wizard() {
         <div class="card stack">
           <h2>Watching {result?.displayName ?? detected?.profileId}</h2>
           <p>
-            Sloppycat now checks this profile every {settings?.intervalMinutes ?? 60} minutes while Chrome is open. Anything new that you haven't marked
+            Sloppycat now checks this profile every {fmtInterval(settings?.intervalMinutes ?? DEFAULT_SETTINGS.intervalMinutes)} while Chrome is open. Anything new that you haven't marked
             "mine" becomes an alert with a takedown packet.
           </p>
           <div class="row">

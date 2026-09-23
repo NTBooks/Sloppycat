@@ -83,7 +83,7 @@ at 1000 albums, the Goodreads adapter reads 10 pages of 30. Prolific back catalo
 need paging work. Only Spotify reports a total to compare against, so only Spotify can tell you it saw fewer
 than exist; on the others a truncated catalogue is silent.
 
-**Lookalike search is shallow.** It checks your three most recent titles, every sixth run, on the platforms
+**Lookalike search is shallow.** It checks your three most recent titles, every other check (about once a day), on the platforms
 that can search. A clone of an older title won't be found unless someone reports it.
 
 **Amazon can challenge the request.** Running inside your own session usually avoids it, and a challenge

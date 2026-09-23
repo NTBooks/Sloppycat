@@ -39,7 +39,7 @@ Snapshot your own profile on Spotify, Apple Music, Deezer, Amazon or Goodreads. 
 
 Everything you untick comes with the takedown letter already written: the right form for that platform, the steps in the order the platform wants them, and your links and the release id filled in. You copy it and send it.
 
-Then it keeps checking on a timer, hourly by default, and tells you when something new turns up that you have not claimed. It also looks for near-copies of your titles listed elsewhere under a made-up name, which is the half of this you cannot catch by watching your own page.
+Then it keeps checking on a timer, every twelve hours by default, and tells you when something new turns up that you have not claimed. It also looks for near-copies of your titles listed elsewhere under a made-up name, which is the half of this you cannot catch by watching your own page.
 
 IT IS NOT AN AI DETECTOR
 

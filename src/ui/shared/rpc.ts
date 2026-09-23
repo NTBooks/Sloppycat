@@ -11,6 +11,13 @@ export function fmtDate(iso: string | undefined): string {
   return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+/** A check interval as it reads in a sentence after "every": "hour", "12 hours", "45 minutes". */
+export function fmtInterval(minutes: number): string {
+  if (minutes % 60 !== 0) return `${minutes} minutes`;
+  const h = minutes / 60;
+  return h === 1 ? "hour" : `${h} hours`;
+}
+
 export function download(filename: string, text: string, type = "text/markdown"): void {
   const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);

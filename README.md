@@ -97,7 +97,7 @@ is selling under your name somewhere else that's the infringement form.
 
 ### Then it watches
 
-After the snapshot it keeps checking on a timer, default every hour, minimum fifteen minutes. Anything new
+After the snapshot it keeps checking on a timer, default every twelve hours, minimum fifteen minutes. Anything new
 that you haven't already claimed becomes an alert with its packet ready.
 
 <p align="center">

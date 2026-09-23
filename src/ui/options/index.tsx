@@ -3,12 +3,20 @@ import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { Button, Chip, CopyButton, Empty, RunPanel } from "../shared/components";
 import { useRun, useStorage } from "../shared/hooks";
-import { download, fmtDate, send, openPage } from "../shared/rpc";
+import { download, fmtDate, fmtInterval, send, openPage } from "../shared/rpc";
 import { serializeList, parseDisclosure, serializeDisclosure } from "../../lists/format";
 import { addSource, refreshSource, removeSource, setSourceEnabled } from "../../lists/sources";
 import { hasListAccess, hostOf, listUrlProblem, requestListAccess } from "../../lists/permissions";
 import { toUblockFilters } from "../../lists/export-ublock";
 import { GITHUB_CLIENT_ID, startDeviceFlow, pollDeviceFlow, upsertGist } from "../../github";
+import { DEFAULT_SETTINGS } from "../../types";
+
+/** Hours, not minutes: nobody chooses 720. A value set some other way stays listed, so it shows as it is. */
+const INTERVAL_CHOICES = [60, 180, 360, 720, 1440];
+
+function intervalChoices(current: number): number[] {
+  return INTERVAL_CHOICES.includes(current) ? INTERVAL_CHOICES : [...INTERVAL_CHOICES, current].sort((a, b) => a - b);
+}
 
 function General() {
   const [settings, setSettings] = useStorage("settings");
@@ -18,14 +26,15 @@ function General() {
       <h2>Monitoring</h2>
       <div class="row" style="gap:20px">
         <div>
-          <label>Check every (minutes, min 15)</label>
-          <input
-            type="number"
-            min={15}
-            step={5}
-            value={settings.intervalMinutes}
-            onChange={(e) => void setSettings({ ...settings, intervalMinutes: Math.max(15, Number((e.target as HTMLInputElement).value) || 60) })}
-          />
+          <label>Check every</label>
+          <select
+            value={String(settings.intervalMinutes)}
+            onChange={(e) => void setSettings({ ...settings, intervalMinutes: Math.max(15, Number((e.target as HTMLSelectElement).value) || DEFAULT_SETTINGS.intervalMinutes) })}
+          >
+            {intervalChoices(settings.intervalMinutes).map((m) => (
+              <option value={String(m)}>{fmtInterval(m)}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label title="Only does anything while Wider search is turned on below.">Lookalike search every N checks</label>
@@ -34,7 +43,7 @@ function General() {
             min={1}
             disabled={!settings.experiments.lookalikeSearch}
             value={settings.lookalikeEveryNRuns}
-            onChange={(e) => void setSettings({ ...settings, lookalikeEveryNRuns: Math.max(1, Number((e.target as HTMLInputElement).value) || 6) })}
+            onChange={(e) => void setSettings({ ...settings, lookalikeEveryNRuns: Math.max(1, Number((e.target as HTMLInputElement).value) || DEFAULT_SETTINGS.lookalikeEveryNRuns) })}
           />
         </div>
         <div>

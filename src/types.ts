@@ -259,8 +259,11 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  intervalMinutes: 60,
-  lookalikeEveryNRuns: 6,
+  // Twice a day. Real releases come weeks apart, and a fake sitting for twelve hours costs little next
+  // to opening a background window every hour for a check that almost always finds nothing.
+  intervalMinutes: 720,
+  // Every other check, so about once a day.
+  lookalikeEveryNRuns: 2,
   notifications: true,
   listUpdates: true,
   defaultDisclosure: {},
