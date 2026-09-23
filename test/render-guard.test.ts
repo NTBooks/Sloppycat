@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ADHOC_LIMIT, isGone, RenderBudget, RENDERS_PER_PROFILE, RUN_SLACK } from "../src/render-guard";
+import { looksLikeAmazonChallenge } from "../src/adapters/shared";
 
 describe("RenderBudget during a run", () => {
   // The whole point of sizing the allowance to the queue: a scheduled check must never be cut
@@ -68,5 +69,23 @@ describe("isGone", () => {
     expect(isGone(new Error("HTTP 503"))).toBe(false);
     expect(isGone(new Error("Bot challenge at https://www.amazon.com/stores/author/B0/allbooks"))).toBe(false);
     expect(isGone(undefined)).toBe(false);
+  });
+});
+
+describe("the background window's sign does not blind the challenge check", () => {
+  // The window prefixes the page title to say whose window it is. Amazon serves a captcha as
+  // "Robot Check", and matching that title too strictly would turn a challenge into a silent
+  // empty catalogue, which is the one failure mode nobody would notice.
+  it("still recognises a Robot Check page once the title is prefixed", () => {
+    const captcha = "<html><head><title>Sloppycat is reading — Robot Check</title></head><body></body></html>";
+    expect(looksLikeAmazonChallenge(captcha)).toBe(true);
+  });
+
+  it("recognises the untouched page as before", () => {
+    expect(looksLikeAmazonChallenge("<html><head><title>Robot Check</title></head></html>")).toBe(true);
+  });
+
+  it("does not call an ordinary page a challenge", () => {
+    expect(looksLikeAmazonChallenge("<html><head><title>Sloppycat is reading — Jane Doe: Books</title></head></html>")).toBe(false);
   });
 });

@@ -59,11 +59,13 @@ export function textOf(el: Element | null | undefined): string {
 }
 
 /** Amazon serves a captcha interstitial to traffic it doesn't like. */
+// The title is matched loosely because the background window prefixes it to say whose window it
+// is, and losing challenge detection to that would turn a captcha into a silent empty catalogue.
 export function looksLikeAmazonChallenge(html: string): boolean {
   return (
     /api-services-support@amazon\.com/i.test(html) ||
     /Type the characters you see in this image/i.test(html) ||
-    /<title>\s*Robot Check\s*<\/title>/i.test(html) ||
+    /<title>[^<]*Robot Check[^<]*<\/title>/i.test(html) ||
     /captchacharacters/i.test(html)
   );
 }

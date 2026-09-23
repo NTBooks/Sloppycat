@@ -352,6 +352,102 @@ export async function extractFromTab(tabId: number, platform: Platform, profileI
 }
 
 /**
+ * Cover the background page with a sign saying whose window this is.
+ *
+ * Chrome gives an extension a popup window with no address bar and no tab strip, so what the user
+ * sees is a chromeless Spotify with an unfamiliar icon in the taskbar: the exact shape of a phishing
+ * window. The page underneath still has to load and still has to be read, so it is covered rather
+ * than replaced, and the title and favicon are changed so the taskbar agrees with the window.
+ *
+ * Runs in the page, so it is self-contained: nothing here may refer to anything outside it.
+ */
+function paint(heading: string, detail: string, iconUrl: string): void {
+  const ID = "sloppycat-curtain";
+  // Prefixed rather than replaced: the page's own title is evidence. Amazon serves a captcha as
+  // "Robot Check", and throwing that away would turn a challenge into a silent empty catalogue.
+  const mark = "Sloppycat is reading — ";
+  if (!document.title.startsWith(mark)) document.title = mark + document.title;
+  // The favicon is what the taskbar shows, and Spotify's own makes this look like Spotify's window.
+  for (const l of Array.from(document.querySelectorAll("link[rel~='icon']"))) l.remove();
+  const icon = document.createElement("link");
+  icon.rel = "icon";
+  icon.href = iconUrl;
+  document.head?.appendChild(icon);
+
+  let el = document.getElementById(ID);
+  if (!el) {
+    el = document.createElement("div");
+    el.id = ID;
+    el.setAttribute("role", "status");
+    el.style.cssText = [
+      "position:fixed",
+      "inset:0",
+      "z-index:2147483647",
+      "background:#0f0f10",
+      "color:#f4f4f5",
+      "display:flex",
+      "flex-direction:column",
+      "align-items:center",
+      "justify-content:center",
+      "gap:10px",
+      "padding:32px",
+      "text-align:center",
+      "font:14px/1.6 system-ui,-apple-system,Segoe UI,sans-serif",
+    ].join(";");
+    (document.body ?? document.documentElement).appendChild(el);
+  }
+  el.textContent = "";
+
+  const img = document.createElement("img");
+  img.src = iconUrl;
+  img.alt = "";
+  img.width = 56;
+  img.height = 56;
+  img.style.cssText = "margin-bottom:4px";
+  el.appendChild(img);
+
+  // The name first. Someone who finds this window needs to know whose it is before anything else.
+  const brand = document.createElement("div");
+  brand.style.cssText = "font-size:20px;font-weight:650;letter-spacing:-0.01em";
+  brand.textContent = "Sloppycat";
+  el.appendChild(brand);
+
+  const d = document.createElement("div");
+  d.style.cssText = "max-width:48ch;color:#e4e4e7";
+  d.textContent = detail;
+  el.appendChild(d);
+
+  const where = document.createElement("div");
+  where.style.cssText =
+    "max-width:60ch;color:#a1a1aa;font-size:12px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all";
+  where.textContent = heading;
+  el.appendChild(where);
+
+  const foot = document.createElement("div");
+  foot.style.cssText = "max-width:48ch;color:#71717a;font-size:12px;margin-top:6px";
+  foot.textContent =
+    "This window belongs to the Sloppycat extension. It opened itself to read a public page and closes on its own. Nothing is sent anywhere. Closing it stops the check.";
+  el.appendChild(foot);
+}
+
+/**
+ * Put the sign up, or change what it says. Cheap enough to call on every navigation event, which is
+ * what it takes to beat the page's own paint: the window is on screen while the page loads.
+ */
+async function showCurtain(tabId: number, heading: string, detail: string): Promise<void> {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: paint,
+      args: [heading, detail, chrome.runtime.getURL("icons/icon-48.png")],
+      injectImmediately: true,
+    });
+  } catch {
+    // The page can be mid-navigation, or gone. The next event puts it up.
+  }
+}
+
+/**
  * Set when the user closes the background window. Closing it is an instruction, not a fault: the run
  * stops there rather than opening another one, and nothing reopens until the user asks again.
  */
@@ -371,11 +467,25 @@ function render(url: string, platform: Platform, profileId: string): Promise<Ext
       // One reused tab rather than one per page: there is never a second tab to notice, and never a
       // stray tab left behind if the worker is stopped between opening and closing it.
       await log(`Loading ${short(url)}`);
-      await chrome.tabs.update(tabId, { url, active: false });
-      await waitForLoad(tabId, 20000);
-      await log("Page loaded, letting it settle");
-      await new Promise((r) => setTimeout(r, 1500));
-      return await extractFromTab(tabId, platform, profileId);
+      const where = short(url);
+      const why = "Checking a page you watch for releases the artist did not publish.";
+      // Re-applied on every navigation event for this tab: each one repaints the page and takes the
+      // sign with it. The listener goes at the end of the render.
+      const repaint = (id: number) => {
+        if (id === tabId) void showCurtain(tabId, where, why);
+      };
+      chrome.tabs.onUpdated.addListener(repaint);
+      try {
+        await chrome.tabs.update(tabId, { url, active: false });
+        await showCurtain(tabId, where, why);
+        await waitForLoad(tabId, 20000);
+        await log("Page loaded, letting it settle");
+        await showCurtain(tabId, where, "The page has loaded. Reading the catalogue from it now.");
+        await new Promise((r) => setTimeout(r, 1500));
+        return await extractFromTab(tabId, platform, profileId);
+      } finally {
+        chrome.tabs.onUpdated.removeListener(repaint);
+      }
     } catch (e) {
       // There is deliberately no retry here. Reopening a window the user just closed is what made
       // this feel like it was fighting them.
