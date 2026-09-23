@@ -417,7 +417,14 @@ function paint(heading: string, detail: string, iconUrl: string): void {
     (document.head ?? document.documentElement).appendChild(style);
   }
 
-  let el = document.getElementById(ID);
+  // Rebuilding on every navigation event churns the DOM, and the extractor decides a page has
+  // settled by watching for the DOM to go quiet. Saying the same thing again is not worth fighting
+  // it for, so an unchanged sign is left alone.
+  const stamp = `${heading}|${detail}`;
+  const existing = document.getElementById(ID);
+  if (existing && existing.dataset.sloppycatStamp === stamp) return;
+
+  let el = existing;
   if (!el) {
     el = document.createElement("div");
     el.id = ID;
@@ -439,6 +446,7 @@ function paint(heading: string, detail: string, iconUrl: string): void {
     ].join(";");
     (document.body ?? document.documentElement).appendChild(el);
   }
+  el.dataset.sloppycatStamp = stamp;
   el.textContent = "";
 
   const card = document.createElement("div");

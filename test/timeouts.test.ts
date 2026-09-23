@@ -63,3 +63,26 @@ describe("the background window's title prefix", () => {
     expect(applyPrefix("Robot Check")).toContain("Robot Check");
   });
 });
+
+describe("Amazon's Show more expansion is bounded by the clock", () => {
+  // Thirty clicks waiting five seconds each is two and a half minutes of pressing a button, and an
+  // author with 1800 titles accepts every one of them. The check then outlived its own message
+  // channel and came back with nothing.
+  const EXPAND_BUDGET_MS = 45_000;
+
+  it("cannot run longer than its budget however many pages there are", () => {
+    const clicks = 30;
+    const waitPerClick = 5_000;
+    expect(clicks * waitPerClick).toBeGreaterThan(EXPAND_BUDGET_MS);
+    // A deadline checked in both loops is what makes the worst case the budget, not the product.
+    expect(EXPAND_BUDGET_MS).toBeLessThan(75_000);
+  });
+
+  it("leaves room for the page to answer before the worker gives up on it", () => {
+    const RESPOND_BY_MS = 75_000;
+    const EXTRACT_TIMEOUT_MS = 90_000;
+    // The page must answer first, so the reason reported is the page's rather than a bare deadline.
+    expect(EXPAND_BUDGET_MS).toBeLessThan(RESPOND_BY_MS);
+    expect(RESPOND_BY_MS).toBeLessThan(EXTRACT_TIMEOUT_MS);
+  });
+});
