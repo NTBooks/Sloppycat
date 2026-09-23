@@ -320,7 +320,16 @@ async function pageThroughCatalog(caps: SpotifyCapture[], have: number): Promise
   return extra;
 }
 
-export async function extractFromTab(tabId: number, platform: Platform, profileId: string): Promise<ExtractResult> {
+/**
+ * @param driveThePage true only for the background tab, where operating the page's own controls
+ *   (sorting a grid, expanding it) is ours to do. Never for a tab the reader has open.
+ */
+export async function extractFromTab(
+  tabId: number,
+  platform: Platform,
+  profileId: string,
+  driveThePage = false,
+): Promise<ExtractResult> {
   if (platform === "spotify" && !profileId.includes(":")) {
     // Structured data first; the DOM is virtualized and only a fallback.
     await log("Waiting for Spotify to hand over the catalogue (up to 12s)");
@@ -344,7 +353,7 @@ export async function extractFromTab(tabId: number, platform: Platform, profileI
   await log("Reading the page contents");
   await chrome.scripting.executeScript({ target: { tabId }, files: ["content/extract.js"] });
   const res = (await withTimeout(
-    chrome.tabs.sendMessage(tabId, { type: "extract:run", platform, profileId }),
+    chrome.tabs.sendMessage(tabId, { type: "extract:run", platform, profileId, driveThePage }),
     EXTRACT_TIMEOUT_MS,
     "Reading the page",
   )) as { ok: true; result: ExtractResult } | { ok: false; error: string };
@@ -552,7 +561,7 @@ function render(url: string, platform: Platform, profileId: string): Promise<Ext
             await log("Page loaded, letting it settle");
             await showCurtain(tabId, where, "Reading the page");
             await new Promise((r) => setTimeout(r, 1500));
-            return await extractFromTab(tabId, platform, profileId);
+            return await extractFromTab(tabId, platform, profileId, true);
           })(),
           RENDER_TIMEOUT_MS,
           `Reading ${where}`,
@@ -805,9 +814,18 @@ export async function ingestSnapshot(profile: Profile, result: ExtractResult, do
    */
   const trusted = !result.partial;
   const items = trusted ? read : [...read, ...(prev?.items ?? []).filter((o) => !read.some((n) => n.itemId === o.itemId))];
+  /**
+   * A partial read in publication order is the top of the catalogue, so something genuinely new is
+   * in it and everything the boundary dropped is old. Comparing by date rather than by membership
+   * survives the window changing size between checks, which it will.
+   */
+  const newestKnown = (prev?.items ?? []).reduce((a, i) => (i.releaseDate && i.releaseDate > a ? i.releaseDate : a), "");
+  const worthAlerting = (i: SnapshotItem) => trusted || (!!result.newestFirst && !!i.releaseDate && i.releaseDate >= newestKnown);
   if (!trusted) {
     await log(
-      `${profile.displayName ?? profile.profileId}: read ${read.length} of a longer list, so nothing here counts as new`,
+      result.newestFirst
+        ? `${profile.displayName ?? profile.profileId}: read the newest ${read.length} of a longer list`
+        : `${profile.displayName ?? profile.profileId}: read ${read.length} of a longer list, so nothing here counts as new`,
     );
   }
   await storage.update("snapshots", (all) => ({
@@ -843,10 +861,11 @@ export async function ingestSnapshot(profile: Profile, result: ExtractResult, do
     }
   }
 
-  if (prev && trusted) {
+  if (prev && (trusted || result.newestFirst)) {
     const d = diffSnapshots(prev.items, items);
     for (let added of d.added) {
       if (mine.has(added.itemId) || notMine.has(added.itemId)) continue;
+      if (!worthAlerting(added)) continue;
       if (adapter.enrich) added = await adapter.enrich(added, c);
       newAlerts.push({
         id: crypto.randomUUID(),

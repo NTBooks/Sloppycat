@@ -177,10 +177,11 @@
         <li><strong>offscreen</strong> parses saved HTML from a platform page, which Chrome's extension worker cannot do on its own.</li>
         <li>
           <strong>Host permissions</strong> for <code>open.spotify.com</code>, <code>api-partner.spotify.com</code>,
-          <code>music.apple.com</code>, <code>itunes.apple.com</code>, <code>deezer.com</code>,
-          <code>api.deezer.com</code>, <code>amazon.com</code> and its country domains,
-          <code>goodreads.com</code>, <code>googleapis.com</code> and <code>openlibrary.org</code>: the platforms
-          whose catalogs it reads. Plus <code>raw.githubusercontent.com</code>,
+          <code>music.apple.com</code>, <code>itunes.apple.com</code>, <code>api.deezer.com</code> and
+          <code>googleapis.com</code>: the platforms whose catalogs it reads. On Amazon and Goodreads it holds
+          paths rather than whole sites &mdash; <code>/stores/*</code> and <code>/s*</code> on each Amazon
+          country domain, <code>/author/*</code> and <code>/search*</code> on Goodreads &mdash; so your cart,
+          your orders and your saved payment methods are not addresses it can reach. Plus <code>raw.githubusercontent.com</code>,
           <code>gist.githubusercontent.com</code>, <code>gist.github.com</code>, <code>api.github.com</code> and
           <code>github.com</code>: where lists are fetched from and, at your request, published to.
         </li>

@@ -315,6 +315,12 @@ export interface ExtractResult {
    * newest-first window.
    */
   counts?: Record<string, number>;
+  /**
+   * The page was in publication order when it was read, so a partial read is the top of the
+   * catalogue rather than an arbitrary slice of it. That is what makes anything in a partial read
+   * comparable: a new release lands at the top, and the boundary only loses old ones.
+   */
+  newestFirst?: boolean;
   /** Total items we actually saw, when the platform only gave us a window of the catalog. */
   partial?: boolean;
 }

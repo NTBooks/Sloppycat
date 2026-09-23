@@ -103,3 +103,38 @@ describe("a partial read must not manufacture new releases", () => {
     expect(added(merged, ["b", "c", "d"])).toEqual([]);
   });
 });
+
+describe("a newest-first partial read can still be compared", () => {
+  // Sorted by publication date, a partial read is the top of the catalogue: something genuinely
+  // new is in it, and what the boundary drops is old. Comparing by date rather than by membership
+  // survives the window changing size between checks, which it does every time.
+  const newestKnown = (items: { releaseDate?: string }[]) =>
+    items.reduce((a, i) => (i.releaseDate && i.releaseDate > a ? i.releaseDate : a), "");
+
+  const worthAlerting = (i: { releaseDate?: string }, opts: { partial: boolean; newestFirst: boolean }, prev: { releaseDate?: string }[]) =>
+    !opts.partial || (opts.newestFirst && !!i.releaseDate && i.releaseDate >= newestKnown(prev));
+
+  const prev = [{ releaseDate: "2021-09-10" }, { releaseDate: "2018-01-19" }];
+
+  it("reports a release newer than anything already known", () => {
+    expect(worthAlerting({ releaseDate: "2026-04-14" }, { partial: true, newestFirst: true }, prev)).toBe(true);
+  });
+
+  it("ignores an old book that merely came into view", () => {
+    expect(worthAlerting({ releaseDate: "1997-05-02" }, { partial: true, newestFirst: true }, prev)).toBe(false);
+  });
+
+  it("ignores everything when the order is unknown, because nothing can be concluded", () => {
+    expect(worthAlerting({ releaseDate: "2026-04-14" }, { partial: true, newestFirst: false }, prev)).toBe(false);
+  });
+
+  it("reports everything new when the read was complete, however old it is", () => {
+    expect(worthAlerting({ releaseDate: "1997-05-02" }, { partial: false, newestFirst: false }, prev)).toBe(true);
+  });
+
+  // A back-dated fake is exactly what a newest-first window cannot see, which is why the count
+  // comparison exists separately and why limits.md says so.
+  it("cannot see a fake dated into the back catalogue, and does not pretend to", () => {
+    expect(worthAlerting({ releaseDate: "2019-01-01" }, { partial: true, newestFirst: true }, prev)).toBe(false);
+  });
+});

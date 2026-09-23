@@ -94,8 +94,12 @@ Paste each into the matching box. Keep them literal; a reviewer checks them agai
 - **offscreen** — Parses saved HTML from a platform page with DOMParser, which is unavailable in the
   extension service worker.
 - **Host permissions** — Reads the public catalog pages of the platforms the user watches
-  (Spotify, Apple Music, Deezer, Amazon, Goodreads, Google Books, Open Library), and fetches the lists the
-  user subscribed to from GitHub, publishing the user's own list there at their request.
+  (Spotify, Apple Music, Deezer, Amazon, Goodreads, Google Books), and fetches the lists the user subscribed
+  to from GitHub, publishing the user's own list there at their request. Scoped to paths wherever the site
+  is not a single-page app: on Amazon only `/stores/*` and `/s*`, on Goodreads only `/author/*` and
+  `/search*`, which is the difference between reading an author's catalog and being able to reach a cart or
+  an order history. Spotify and Apple Music are whole hosts because a path stops matching as soon as the
+  user navigates inside the app, and neither host carries a checkout.
 - **Optional host permissions (`https://*/*`)** — A list is a Markdown file the creator hosts themselves,
   and not every creator uses GitHub. The extension never fetches an arbitrary host on its own: when the
   user pastes a list URL outside the GitHub hosts above, the page calls `chrome.permissions.request` for

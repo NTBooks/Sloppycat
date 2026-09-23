@@ -55,9 +55,13 @@ cached on your computer.
   you have turned that on. Used only on the sites listed below.
 - **offscreen** — parses saved HTML from a platform page. Chrome's extension worker cannot parse HTML on its
   own, and this keeps the work off the page you are reading.
-- **host permissions** for `open.spotify.com`, `music.apple.com`, `itunes.apple.com`, `api.deezer.com`,
-  `deezer.com`, `amazon.com` and its country domains, `goodreads.com`, `googleapis.com`, `openlibrary.org`,
-  `api-partner.spotify.com` — the platforms whose catalogs it reads; and `raw.githubusercontent.com`,
+- **host permissions**, kept to the paths that are actually read rather than whole sites. On Amazon that is
+  `/stores/*` and `/s*` on each country domain, and on Goodreads `/author/*` and `/search*`: the author pages
+  and the search, and nothing else. Your cart, your orders and your saved payment methods are not addresses
+  this extension can reach. `open.spotify.com`, `api-partner.spotify.com` and `music.apple.com` are whole
+  hosts because they are single-page apps, where a path would stop matching the moment you navigated inside
+  them; neither carries a checkout. `itunes.apple.com`, `api.deezer.com` and `googleapis.com` are read-only
+  JSON APIs. Plus `raw.githubusercontent.com`,
   `gist.githubusercontent.com`, `gist.github.com`, `api.github.com`, `github.com` — where lists are fetched
   from and, at your request, published to.
 - **optional host permissions**, asked for one host at a time and only when you add a list that lives
