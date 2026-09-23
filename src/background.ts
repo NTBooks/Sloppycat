@@ -13,7 +13,6 @@ import { verifyProfile, runClaimCheck } from "./lists/verify";
 import { getClaim, isFresh } from "./lists/claims";
 import { mergeCreatorDoc } from "./lists/format";
 import {
-  countsOf,
   driftBetween,
   pageRequest,
   parseSpotifyCaptures,
@@ -488,10 +487,6 @@ async function showCurtain(tabId: number, heading: string, detail: string): Prom
  * stops there rather than opening another one, and nothing reopens until the user asks again.
  */
 let abandoned = false;
-
-export function wasAbandoned(): boolean {
-  return abandoned;
-}
 
 function render(url: string, platform: Platform, profileId: string): Promise<ExtractResult> {
   const job = renderQueue.then(async () => {
@@ -1048,11 +1043,6 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         // are proved during a check instead, where the work is counted and reported.
         return { ok: true, verdicts: await lookup(m.platform, m.ids, m.profileUrl, m.pageIds) };
       }
-      case "claims:check": {
-        const m = msg as Extract<Message, { type: "claims:check" }>;
-        const claim = await runClaimCheck(m.listUrl, m.platform, ctx());
-        return { ok: claim.state === "verified", claim };
-      }
       case "list:fromBio": {
         // The wizard has just taken a snapshot and holds the bio, so this costs no second page load.
         const m = msg as Extract<Message, { type: "list:fromBio" }>;
@@ -1245,12 +1235,6 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         };
         await storage.update("alerts", (all) => ({ ...all, [alert.id]: alert }));
         await notify(profile, [alert]);
-        return { ok: true };
-      }
-      case "open:onboard": {
-        const m = msg as Extract<Message, { type: "open:onboard" }>;
-        const q = m.platform && m.profileId ? `?platform=${m.platform}&profileId=${encodeURIComponent(m.profileId)}` : "";
-        await openPage(`ui/onboard/index.html${q}`);
         return { ok: true };
       }
       case "offscreen:parse":

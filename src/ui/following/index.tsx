@@ -129,6 +129,18 @@ function Watched(props: { profileKey: string; profile: Profile; snapshot?: Snaps
       {p.lastError && <div class="facts" style="color:var(--bad)">Last check failed: {p.lastError}</div>}
       {p.watchOnly && <TheirList profileKey={props.profileKey} profile={p} subscribed={props.subscribed} />}
       <div class="row">
+        {/* Whose page this is, where the page is. It used to live in a second copy of this list in
+            Settings, which is gone. */}
+        <select
+          value={p.watchOnly ? "fan" : "mine"}
+          onChange={(e) =>
+            void send({ type: "profile:watchOnly", profileKey: props.profileKey, watchOnly: (e.target as HTMLSelectElement).value === "fan" })
+          }
+          title="Whose page this is. A page you follow is watched and nothing else."
+        >
+          <option value="fan">I follow them</option>
+          <option value="mine">It's mine</option>
+        </select>
         <Button onClick={() => void send({ type: "run:now", profileKey: props.profileKey })} title="Read the page now instead of waiting for the timer">
           Check now
         </Button>

@@ -3,131 +3,13 @@ import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { Button, Chip, CopyButton, Empty, RunPanel } from "../shared/components";
 import { useRun, useStorage } from "../shared/hooks";
-import { download, fmtDate, send, openPage} from "../shared/rpc";
-import { PLATFORM_LABEL } from "../../types";
-import { adapterFor } from "../../adapters";
+import { download, fmtDate, send, openPage } from "../shared/rpc";
 import { serializeList, parseDisclosure, serializeDisclosure } from "../../lists/format";
 import { addSource, refreshSource, removeSource, setSourceEnabled } from "../../lists/sources";
 import { hasListAccess, hostOf, listUrlProblem, requestListAccess } from "../../lists/permissions";
 import { toUblockFilters } from "../../lists/export-ublock";
 import * as storage from "../../storage";
 import { GITHUB_CLIENT_ID, startDeviceFlow, pollDeviceFlow, upsertGist } from "../../github";
-
-function Profiles() {
-  const [profiles] = useStorage("profiles");
-  const [url, setUrl] = useState("");
-  const [watchOnly, setWatchOnly] = useState(true);
-  const [err, setErr] = useState("");
-  const run = useRun();
-  const list = Object.entries(profiles ?? {});
-  return (
-    <section class="card stack">
-      <div class="row" style="justify-content:space-between">
-        <h2 style="margin:0">Watched profiles</h2>
-        <a href="../following/index.html">Open the Following page</a>
-      </div>
-      <form
-        class="row"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setErr("");
-          const r = await send<{ ok: boolean; error?: string }>({ type: "profile:add", url, watchOnly });
-          if (!r.ok) setErr(r.error ?? "Could not add");
-          else setUrl("");
-        }}
-      >
-        <input type="url" placeholder="Paste a Spotify / Apple Music / Deezer / Amazon author / Goodreads author URL" value={url} onInput={(e) => setUrl((e.target as HTMLInputElement).value)} style="flex:1" />
-        <select value={watchOnly ? "fan" : "mine"} onChange={(e) => setWatchOnly((e.target as HTMLSelectElement).value === "fan")} title="Whose page this is">
-          <option value="fan">I follow them</option>
-          <option value="mine">It's mine</option>
-        </select>
-        <Button type="submit" kind="primary">
-          Watch
-        </Button>
-      </form>
-      <div class="muted" style="font-size:12px">
-        A page you follow is watched and nothing more: no list to publish, no bio to claim, and alerts on it never write into your own
-        list. Use the wizard for your own page, where the rest of that applies. This table is the settings view; the Following page is
-        the same profiles laid out to read.
-      </div>
-      {err && <div class="notice bad">{err}</div>}
-      <RunPanel run={run} />
-      {list.length === 0 ? (
-        <Empty>No profiles yet. Add one above, or use the popup on a profile page you have open.</Empty>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Profile</th>
-              <th>Status</th>
-              <th>Last check</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map(([key, p]) => (
-              <tr key={key}>
-                <td>
-                  <a href={p.url} target="_blank" rel="noreferrer">
-                    {p.displayName ?? p.profileId}
-                  </a>
-                  <div class="muted" style="font-size:12px">
-                    {PLATFORM_LABEL[p.platform]} · {adapterFor(p.platform).strategy}
-                  </div>
-                </td>
-                <td>
-                  {p.watchOnly ? (
-                    <span title="Someone else's page. Watched, and nothing more.">
-                      <Chip>Following</Chip>
-                    </span>
-                  ) : p.verified ? (
-                    <span title="This profile's bio links to your list, so every copy of the extension can tell the list really speaks for it.">
-                      <Chip tone="ok">Claimed</Chip>
-                    </span>
-                  ) : adapterFor(p.platform).supportsBio ? (
-                    <span title="Your list works as it is. Putting its URL in this profile's bio is what proves the list is yours. Every check looks again, so there is nothing to press.">
-                      <Chip>List link not in bio yet</Chip>
-                    </span>
-                  ) : (
-                    <span title="This platform has no bio only the account holder can edit, so there is nothing here to prove it with. Claim on Spotify, Amazon or Goodreads instead.">
-                      <Chip>No bio on this platform</Chip>
-                    </span>
-                  )}
-                  {p.lastError && (
-                    <div class="muted" style="font-size:12px;color:var(--bad)">
-                      {p.lastError}
-                    </div>
-                  )}
-                </td>
-                <td class="when">{fmtDate(p.lastRunAt)}</td>
-                <td class="row" style="justify-content:flex-end">
-                  <select
-                    value={p.watchOnly ? "fan" : "mine"}
-                    onChange={(e) => void send({ type: "profile:watchOnly", profileKey: key, watchOnly: (e.target as HTMLSelectElement).value === "fan" })}
-                    title="Whose page this is. A page you follow is watched and nothing else."
-                  >
-                    <option value="fan">I follow them</option>
-                    <option value="mine">It's mine</option>
-                  </select>
-                  <Button
-                    onClick={() => void send({ type: "run:now", profileKey: key })}
-                    disabled={run.running}
-                    title={run.running ? "A check is already running" : "Read the page now and compare it with the last snapshot, instead of waiting for the timer"}
-                  >
-                    {run.running && run.currentKey === key ? "Checking…" : "Check now"}
-                  </Button>
-                  <Button kind="danger" onClick={() => void send({ type: "profile:remove", profileKey: key })} title="Forget this page and its snapshot. Alerts it already raised stay.">
-                    Stop watching
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </section>
-  );
-}
 
 function General() {
   const [settings, setSettings] = useStorage("settings");
@@ -575,13 +457,17 @@ function Sources() {
 }
 
 function Options() {
+  // The commentary used to sit inside the watched-pages table, which has moved to the Following
+  // page. A check started from anywhere still reports here, so it moved up rather than away.
+  const run = useRun();
   return (
     <div class="page stack">
       <div class="brand">
         <img src="../../icons/icon-48.png" alt="" />
         <h1>Sloppycat settings</h1>
+        <a href="../following/index.html" style="margin-left:auto">Pages you watch</a>
       </div>
-      <Profiles />
+      <RunPanel run={run} />
       <General />
       <Experimental />
       <WiderSearch />

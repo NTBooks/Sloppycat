@@ -293,13 +293,11 @@ export type Message =
   | { type: "lists:refresh" }
   | { type: "lists:lookup"; platform: Platform; ids: string[] }
   | { type: "verify:profile"; profileKey: string }
-  | { type: "claims:check"; listUrl: string; platform: Platform }
   | { type: "scan:collect"; tabId: number }
   | { type: "dev:simulate"; kind: "new" | "lookalike" | "drift" | "listupdate"; profileKey?: string }
   | { type: "snapshot:fromTab"; tabId: number }
   /** Read the platform's full-catalogue view, for a profile page that only shows the newest few. */
   | { type: "snapshot:full"; platform: Platform; profileId: string }
-  | { type: "open:onboard"; platform?: Platform; profileId?: string }
   | { type: "extract:run"; platform: Platform; profileId: string };
 
 /** Result of an extractor running inside a platform page. */

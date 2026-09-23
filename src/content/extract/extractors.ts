@@ -5,13 +5,6 @@ import { findListUrl, looksLikeAmazonChallenge, textOf } from "../../adapters/sh
 
 export type Extractor = (doc: Document, url: string, profileId: string, now: string) => ExtractResult;
 
-function abs(base: string, href: string | null | undefined): string {
-  try {
-    return new URL(href ?? "", base).toString();
-  } catch {
-    return href ?? "";
-  }
-}
 
 // ---------- Spotify ----------
 

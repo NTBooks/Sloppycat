@@ -1,5 +1,5 @@
 // Thin typed wrapper over chrome.storage.local.
-import type { Alert, ListChange, ListDocument, ListSource, Platform, Profile, RunState, Settings, Snapshot } from "./types";
+import type { Alert, ListChange, ListDocument, ListSource, Profile, RunState, Settings, Snapshot } from "./types";
 import type { Claim } from "./lists/claims";
 import { DEFAULT_SETTINGS } from "./types";
 

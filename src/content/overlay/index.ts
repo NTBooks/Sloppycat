@@ -2,14 +2,12 @@
 // Vanilla DOM on purpose: runs on every platform page, must be light and must not shift layout.
 import type { Identifiers, Platform, Verdict } from "../../types";
 import { adapters, detectPlatform, detectProfile } from "../../adapters";
-import { cardHtml, makeBadge, STATUS_TEXT } from "./card";
+import { cardHtml, makeBadge } from "./card";
 
 const platform: Platform | null = detectPlatform(location.href);
 
-const STATUS_GLYPH: Record<Verdict["status"], string> = { verified: "✓", not_mine: "✗", unconfirmed: "○", likely_accurate: "◷" };
 
 let card: HTMLElement | null = null;
-let cardFor: HTMLElement | null = null;
 /** Anchors already processed, with the item id they resolved to. */
 const processed = new Map<HTMLAnchorElement, string>();
 const verdictCache = new Map<string, Verdict | null>();
@@ -32,13 +30,11 @@ function ensureCard(): HTMLElement {
 
 function hideCard() {
   if (card) card.hidden = true;
-  cardFor = null;
 }
 
 
 function showCard(anchor: HTMLElement, title: string, v: Verdict) {
   const c = ensureCard();
-  cardFor = anchor;
   c.innerHTML = cardHtml(title, v);
   c.hidden = false;
   const r = anchor.getBoundingClientRect();
