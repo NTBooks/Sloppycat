@@ -9,6 +9,9 @@ export const STATUS_TEXT: Record<Verdict["status"], string> = {
   likely_accurate: "Likely genuine: released before AI knockoffs took off",
 };
 
+/** A "not mine" on a page the list does not speak for: it is the list's artist saying so, not this page's. */
+export const OFF_PROFILE_TEXT = "The artist behind this list says this is NOT theirs";
+
 // U+FE0E keeps these as text glyphs; without it Windows renders emoji versions that ignore the badge colour.
 export const STATUS_GLYPH: Record<Verdict["status"], string> = {
   verified: "✓︎",
@@ -43,7 +46,7 @@ export function cardHtml(title: string, v: Verdict): string {
       ? `<div class="sc-muted">No AI disclosure attached.</div>`
       : "";
   return `
-    <div class="sc-head sc-${v.status}"><span class="sc-glyph">${STATUS_GLYPH[v.status]}</span> ${STATUS_TEXT[v.status]}</div>
+    <div class="sc-head sc-${v.status}"><span class="sc-glyph">${STATUS_GLYPH[v.status]}</span> ${v.offProfile ? OFF_PROFILE_TEXT : STATUS_TEXT[v.status]}</div>
     <div class="sc-title">${esc(title)}</div>
     ${v.status === "not_mine" && v.note ? `<div class="sc-note">${esc(v.note)}</div>` : ""}
     ${v.status === "not_mine" && v.firstSeen ? `<div class="sc-muted">Reported ${esc(v.firstSeen)}</div>` : ""}

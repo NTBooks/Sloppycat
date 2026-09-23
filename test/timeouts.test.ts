@@ -1,24 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-
-/**
- * The same shape as the worker's withTimeout. Kept here rather than imported because background.ts
- * touches chrome.* at module scope; what is being pinned is the contract, not the copy.
- */
-function withTimeout<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${what} gave up after ${Math.round(ms / 1000)}s`)), ms);
-    work.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e: unknown) => {
-        clearTimeout(timer);
-        reject(e instanceof Error ? e : new Error(String(e)));
-      },
-    );
-  });
-}
+import { withTimeout } from "../src/worker/timeout";
 
 describe("withTimeout", () => {
   // A content script that never answers used to leave the check on "Reading the page contents"

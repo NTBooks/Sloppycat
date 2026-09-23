@@ -4,14 +4,18 @@
 // responses, and of the request that produced each one, so the extension can:
 //   1. read structured data instead of scraping a virtualized DOM, and
 //   2. page through a long discography by re-issuing the page's own query with a different offset,
-//      using the page's own short-lived credentials, for the profile the user is already looking at.
+//      using the page's own short-lived credentials.
+// The second needs the request headers, which carry those credentials, and they are only kept on a
+// page the extension loaded for itself (see OWN_PAGE_MARK). On a tab the user opened, only the public
+// catalogue responses are kept, and a long discography is read from the extension's own page instead.
 // Read-only otherwise: nothing on the page is modified.
+import { OWN_PAGE_MARK } from "../render-guard";
 
 export interface SpotifyCapture {
   url: string;
   /** Request body, which carries the operation name, variables and persisted-query hash. */
   body: string;
-  /** Request headers, including the short-lived authorization and client tokens. */
+  /** Request headers, including the short-lived authorization and client tokens. Empty on a page the user opened. */
   headers: Record<string, string>;
   json: unknown;
 }
@@ -26,6 +30,8 @@ declare global {
   if (window.__sloppycatCaps) return;
   const caps: SpotifyCapture[] = [];
   window.__sloppycatCaps = caps;
+  // Read once, at document_start, before the player's router rewrites the address.
+  const ownPage = location.hash === `#${OWN_PAGE_MARK}`;
 
   function headersOf(init: RequestInit | undefined, input: RequestInfo | URL): Record<string, string> {
     const out: Record<string, string> = {};
@@ -52,7 +58,7 @@ declare global {
         let body = "";
         if (init?.body) body = String(init.body);
         else if (input instanceof Request) body = await input.clone().text();
-        const headers = headersOf(init, input);
+        const headers = ownPage ? headersOf(init, input) : {};
         res
           .clone()
           .json()

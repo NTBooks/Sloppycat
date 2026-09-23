@@ -8,7 +8,6 @@ import { serializeList, parseDisclosure, serializeDisclosure } from "../../lists
 import { addSource, refreshSource, removeSource, setSourceEnabled } from "../../lists/sources";
 import { hasListAccess, hostOf, listUrlProblem, requestListAccess } from "../../lists/permissions";
 import { toUblockFilters } from "../../lists/export-ublock";
-import * as storage from "../../storage";
 import { GITHUB_CLIENT_ID, startDeviceFlow, pollDeviceFlow, upsertGist } from "../../github";
 
 function General() {
@@ -244,7 +243,7 @@ function MyList() {
           <Button
             kind="danger"
             onClick={async () => {
-              if (confirm("Clear your local list? Published copies are not affected.")) await storage.set("myList", null);
+              if (confirm("Clear your local list? Published copies are not affected.")) await send({ type: "myList:set", doc: null });
             }}
           >
             Clear local list
@@ -283,7 +282,7 @@ function Testing() {
           <Button
             kind="danger"
             onClick={async () => {
-              await storage.set("alerts", {});
+              await send({ type: "alerts:clear" });
               setMsg("Alerts cleared.");
             }}
             disabled={!Object.keys(alerts ?? {}).length}

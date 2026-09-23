@@ -298,7 +298,10 @@ export type Message =
   | { type: "snapshot:fromTab"; tabId: number }
   /** Read the platform's full-catalogue view, for a profile page that only shows the newest few. */
   | { type: "snapshot:full"; platform: Platform; profileId: string }
-  | { type: "extract:run"; platform: Platform; profileId: string };
+  | { type: "extract:run"; platform: Platform; profileId: string }
+  /** Pages ask the worker to write what the worker also writes, so writes to these never race. */
+  | { type: "alerts:clear" }
+  | { type: "myList:set"; doc: ListDocument | null };
 
 /** Result of an extractor running inside a platform page. */
 export interface ExtractResult {
@@ -339,6 +342,12 @@ export interface Verdict {
   /** How this list came to be speaking for the profile. You added it; this says by which route. */
   via?: "own-list" | "self-checked" | "attested" | "community" | "unproved";
   attestedBy?: string;
+  /**
+   * A "not mine" from a creator list shown on a profile that list does not claim, such as an
+   * impostor page using the artist's name. The card names the list's artist rather than implying
+   * the page's own artist said it.
+   */
+  offProfile?: boolean;
 }
 
 /**

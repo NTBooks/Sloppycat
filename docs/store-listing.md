@@ -82,6 +82,9 @@ Paste each into the matching box. Keep them literal; a reviewer checks them agai
 
 - **storage** — Stores the profiles the user chose to watch, catalog snapshots, alerts and settings locally.
   Nothing leaves the browser.
+- **unlimitedStorage** — A snapshot of a large catalog is big: an author with 1,800 titles on Amazon is well
+  over a megabyte, and a few of those reach the default 10 MB local storage limit, after which checks would
+  fail to save. Still local only; nothing leaves the browser.
 - **alarms** — Runs the periodic check on the user's chosen interval. Chrome terminates the extension worker
   between events, so timers are not an option.
 - **notifications** — Tells the user when a release they did not publish appears on a profile they watch, and

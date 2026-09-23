@@ -171,6 +171,7 @@
       <h2>Permissions, and why each one exists</h2>
       <ul>
         <li><strong>storage</strong> keeps your watched profiles, snapshots, decisions and settings on your computer.</li>
+        <li><strong>unlimitedStorage</strong> lifts Chrome's 10 MB cap on that local storage, because a snapshot of a large catalog is big. It is still only on your computer.</li>
         <li><strong>alarms</strong> schedules the periodic check. Without it, checks would stop when the browser worker sleeps.</li>
         <li><strong>notifications</strong> tells you when something new appears on a profile you watch, and, if you leave that on, when a list you subscribed to starts or stops saying something. Both are local: the check that produces them runs in your browser, and nothing about them is reported anywhere.</li>
         <li><strong>tabs</strong> and <strong>scripting</strong> read the public catalog from a platform page, and mark items on pages when you have turned that on. Used only on the sites below.</li>

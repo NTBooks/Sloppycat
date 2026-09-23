@@ -83,3 +83,11 @@ export function isGone(e: unknown): boolean {
 
 export const RENDER_CLOSED =
   "The background window Sloppycat reads pages in was closed mid-check. Nothing is wrong with the profile; the next check will try again.";
+
+/**
+ * Marks a Spotify page as one the extension opened for itself, as the URL fragment. The capture
+ * script only keeps the page's request headers, which carry its short-lived login tokens, on a page
+ * loaded with this, so a Spotify tab the user opened never has them copied anywhere outside Spotify's
+ * own code. A fragment never reaches the server.
+ */
+export const OWN_PAGE_MARK = "sloppycat-read";

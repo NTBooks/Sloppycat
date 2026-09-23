@@ -24,14 +24,20 @@ import type { ListDocument, Platform } from "../types";
 import * as storage from "../storage";
 import { normalizeListUrl } from "../adapters/shared";
 import { sameProfile } from "./sources";
+import { profileIdentity } from "../adapters";
 
 export type ClaimState = "verified" | "failed" | "unchecked";
 
+/**
+ * One list's claim over one profile. Scoped to the profile, not the platform: a roster list names
+ * many artists, and one of them linking it proves nothing about the others. Scoping it wider let a
+ * list name its author's own profile alongside someone else's and come out "checked" for both.
+ */
 export interface Claim {
   listUrl: string;
   platform: Platform;
-  /** The profile that proved the link, once one does. */
-  profileUrl?: string;
+  /** The profile whose bio was read. */
+  profileUrl: string;
   state: ClaimState;
   checkedAt?: string;
   reason?: string;
@@ -42,17 +48,17 @@ export const CLAIM_TTL_MS = 30 * 24 * 3600 * 1000;
 /** Don't hammer a failing claim on every page view. */
 export const CLAIM_RETRY_MS = 6 * 3600 * 1000;
 
-export function claimKey(listUrl: string, platform: Platform): string {
-  return `${normalizeListUrl(listUrl)}|${platform}`;
+export function claimKey(listUrl: string, platform: Platform, profileUrl: string): string {
+  return `${normalizeListUrl(listUrl)}|${platform}|${profileIdentity(profileUrl) ?? profileUrl}`;
 }
 
-export async function getClaim(listUrl: string, platform: Platform): Promise<Claim | undefined> {
+export async function getClaim(listUrl: string, platform: Platform, profileUrl: string): Promise<Claim | undefined> {
   const claims = await storage.get("claims");
-  return claims[claimKey(listUrl, platform)];
+  return claims[claimKey(listUrl, platform, profileUrl)];
 }
 
 export async function setClaim(c: Claim): Promise<void> {
-  await storage.update("claims", (all) => ({ ...all, [claimKey(c.listUrl, c.platform)]: c }));
+  await storage.update("claims", (all) => ({ ...all, [claimKey(c.listUrl, c.platform, c.profileUrl)]: c }));
 }
 
 export function isFresh(c: Claim | undefined): boolean {
@@ -67,7 +73,7 @@ export function attestations(lists: CachedList[]): Map<string, { by: string; che
   for (const l of lists) {
     if (l.doc.type !== "community") continue;
     for (const a of l.doc.attested ?? []) {
-      out.set(`${normalizeListUrl(a.list)}|${a.platform}`, { by: l.doc.title, checked: a.checked });
+      out.set(claimKey(a.list, a.platform, a.profile), { by: l.doc.title, checked: a.checked });
     }
   }
   return out;
@@ -87,8 +93,12 @@ export function isCorroborated(via: Route): boolean {
 }
 
 /**
- * How a cached list came to be speaking for a platform.
+ * How a cached list came to be speaking for a profile.
  * `ownList` is the user's own decisions, which need no corroboration to badge their own page.
+ *
+ * With a profile, the answer is about that profile alone. Without one (an item page, where the
+ * artist is not known), a list counts as checked only when every profile it claims on the platform
+ * has been, since any one of them could be the one the item belongs to.
  */
 export function routeFor(
   list: CachedList,
@@ -96,15 +106,26 @@ export function routeFor(
   claims: Record<string, Claim>,
   attested: Map<string, { by: string; checked?: string }>,
   isOwnList: boolean,
+  profileUrl?: string,
 ): ListRoute {
   if (isOwnList) return { via: "own-list" };
   // Subscribing is the trust decision, the same as adding a filter list.
   if (list.doc.type === "community") return { via: "community" };
-  const key = claimKey(list.source, platform);
-  if (claims[key]?.state === "verified") return { via: "self-checked" };
-  const att = attested.get(key);
-  if (att) return { via: "attested", attestedBy: att.by };
-  return { via: "unproved" };
+  const profiles = profileUrl
+    ? claimsThisProfile(list.doc, platform, profileUrl)
+      ? [profileUrl]
+      : []
+    : claimedProfiles(list.doc, platform);
+  if (!profiles.length) return { via: "unproved" };
+  let attestedBy: string | undefined;
+  for (const p of profiles) {
+    const key = claimKey(list.source, platform, p);
+    if (claims[key]?.state === "verified") continue;
+    const att = attested.get(key);
+    if (!att) return { via: "unproved" };
+    attestedBy ??= att.by;
+  }
+  return attestedBy ? { via: "attested", attestedBy } : { via: "self-checked" };
 }
 
 /** Profiles a creator list claims on one platform, in the order they should be checked. */

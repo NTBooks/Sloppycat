@@ -129,6 +129,18 @@ list speaks for the profiles that link back to it, and for no others.
 
 ## Precedence
 
-For one item id: an explicit `Not mine` beats `Mine`; a creator list beats a community list; `Likely accurate`
-applies only when nothing else matches. Items on an enrolled creator's profile that appear in no section are
-shown as "not yet confirmed".
+For one item id, highest first:
+
+1. A creator list on a profile its `## Creator` table names (or on a single item's page, where there is no
+   profile to check against).
+2. A creator list on a profile it does not name. Only its `Not mine` rows count there, and the card says it
+   is the list's artist speaking, not the page's. This is for an impostor page using the artist's name; a
+   `Mine` row there would be one artist's list vouching for somebody else's catalog, so it is ignored.
+3. A community list.
+
+Within one of those, an explicit `Not mine` beats `Mine`. The order lists were added in never matters.
+`Likely accurate` applies only when nothing else matches, and only where a `Mine` row would. Items on an
+enrolled creator's profile that appear in no section are shown as "not yet confirmed".
+
+Profiles are matched by platform and id, never by the text of the URL, so `https://open.spotify.com/intl-de/artist/X`
+and `https://open.spotify.com/artist/X` are the same profile, and a URL on any other host is none.

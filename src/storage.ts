@@ -51,15 +51,34 @@ export async function get<K extends keyof Schema>(key: K): Promise<Schema[K]> {
   return (v ?? DEFAULTS[key]) as Schema[K];
 }
 
+/** Replace a value. Takes its turn behind any update to the same key, so it is never undone by one. */
 export async function set<K extends keyof Schema>(key: K, value: Schema[K]): Promise<void> {
-  await chrome.storage.local.set({ [key]: value });
+  await update(key, () => value);
 }
 
-export async function update<K extends keyof Schema>(key: K, fn: (cur: Schema[K]) => Schema[K]): Promise<Schema[K]> {
-  const cur = await get(key);
-  const next = fn(cur);
-  await set(key, next);
-  return next;
+/**
+ * Updates still queued or running, per key. A read-modify-write is two awaits apart, so two updates
+ * to one key in the same context could both read the old value and the second would throw the
+ * first away; the worker does exactly that, logging while it records a result. Chaining them per key
+ * makes each one see the last. Across contexts, keys the worker writes are written by it alone: pages
+ * send a message instead.
+ */
+const pending = new Map<keyof Schema, Promise<unknown>>();
+
+export function update<K extends keyof Schema>(key: K, fn: (cur: Schema[K]) => Schema[K]): Promise<Schema[K]> {
+  const run = async () => {
+    const next = fn(await get(key));
+    await chrome.storage.local.set({ [key]: next });
+    return next;
+  };
+  const prev = pending.get(key) ?? Promise.resolve();
+  const job = prev.then(run, run);
+  const tail = job.catch(() => undefined);
+  pending.set(key, tail);
+  void tail.then(() => {
+    if (pending.get(key) === tail) pending.delete(key);
+  });
+  return job;
 }
 
 export function onChange(keys: (keyof Schema)[], cb: () => void): () => void {

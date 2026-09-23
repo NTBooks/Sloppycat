@@ -5,6 +5,7 @@ import * as storage from "../storage";
 import type { CachedList } from "../storage";
 import { expiresToMs, parseList } from "./format";
 import { normalizeListUrl } from "../adapters/shared";
+import { profileIdentity } from "../adapters";
 import { accessErrorFor, hasListAccess, listUrlProblem, releaseUnusedListAccess } from "./permissions";
 import { attestations, claimsThisProfile, isCorroborated, routeFor, type ListRoute } from "./claims";
 import { forgetSource, recordChanges } from "./changes";
@@ -147,11 +148,19 @@ export async function refreshAll(force = false): Promise<ListChange[]> {
 
 /**
  * Answer "what do the lists say about these items?" for the overlay.
- * Precedence: an explicit not-mine beats mine; creator lists beat community lists for the same id.
- * "unconfirmed" is only returned for items whose creator is enrolled (has a creator list covering that platform),
- * which the caller establishes by passing the profile id when known.
- */
-/**
+ *
+ * Who outranks whom, highest first:
+ *   1. a creator list on a profile it claims (your own list included), or on a page with no profile
+ *      to check against, such as a single item's page
+ *   2. a creator list on a profile it does not claim. Only its "not mine" rows count there: an
+ *      impostor profile using the artist's name is exactly where "this isn't mine, the real one is
+ *      over here" belongs. A "mine" row there would be a list vouching for someone else's catalogue.
+ *   3. a community list
+ * Within one tier an explicit "not mine" beats "mine". The order lists were added in never matters.
+ *
+ * "unconfirmed" is only returned for items whose creator is enrolled (has a creator list covering that
+ * profile), which the caller establishes by passing the profile URL when known.
+ *
  * @param pageIds identifiers the page exposed, keyed by the platform id they belong to
  *                (e.g. { B0C1234567: { isbn: "9780000000000" } }). Lets a claim match a re-upload
  *                that carries the same ISBN or UPC under a different platform id.
@@ -169,20 +178,28 @@ export async function lookup(
   const settings = await storage.get("settings");
 
   const claims = await storage.get("claims");
-  const all: CachedList[] = Object.values(cache).filter((c) => enabled.has(c.source));
+  const lists: CachedList[] = Object.values(cache).filter((c) => enabled.has(c.source));
   const ownSource = settings.myListUrl ?? "local";
-  if (myList) all.unshift({ source: ownSource, doc: myList, fetchedAt: new Date().toISOString() });
+  if (myList) lists.unshift({ source: ownSource, doc: myList, fetchedAt: new Date().toISOString() });
 
   // Every enabled list speaks: the user put it there. The route only records how, so the card can
   // say whether anybody checked the claim against the platform.
-  const attested = attestations(all);
+  const tierOf = (l: CachedList): 1 | 2 | 3 => {
+    if (l.doc.type === "community") return 1;
+    if (!profileUrl) return 3;
+    return claimsThisProfile(l.doc, platform, profileUrl) ? 3 : 2;
+  };
+  const attested = attestations(lists);
   const routes = new Map<string, ListRoute>();
-  const lists = all;
-  for (const l of all) {
-    routes.set(l.source, routeFor(l, platform, claims, attested, l.source === ownSource && !!myList));
+  for (const l of lists) {
+    // Off its own profile, what matters is whether the list really is its artist's, so the route is
+    // taken over the profiles it claims rather than the page it is being shown on.
+    const on = tierOf(l) === 3 ? profileUrl : undefined;
+    routes.set(l.source, routeFor(l, platform, claims, attested, l.source === ownSource && !!myList, on));
   }
 
   const out: Record<string, Verdict> = {};
+  const rankOf = new Map<string, number>();
   const idSet = new Set(ids);
 
   // Build a reverse index of the identifiers this page exposed, so a row that carries the same ISRC,
@@ -206,48 +223,62 @@ export async function lookup(
     }
     return undefined;
   };
-  const via = (l: CachedList) => routes.get(l.source);
-  const viaOf = (l: CachedList): Verdict["via"] => routes.get(l.source)?.via;
-
-  const rank = (v: Verdict, isCreator: boolean) => (v.status === "not_mine" ? 2 : 1) + (isCreator ? 0.5 : 0);
+  const offer = (id: string, v: Verdict, rank: number) => {
+    if (rank > (rankOf.get(id) ?? 0)) {
+      out[id] = v;
+      rankOf.set(id, rank);
+    }
+  };
 
   for (const l of lists) {
-    const isCreator = l.doc.type === "creator";
+    const tier = tierOf(l);
+    const route = routes.get(l.source);
+    const creatorProfile = l.doc.creator.find((c) => c.platform === platform)?.profile;
     for (const r of l.doc.notMine) {
       if (r.platform !== platform) continue;
       const hitId = matchRow(r);
       if (!hitId) continue;
-      const v: Verdict = {
-        status: "not_mine",
-        listTitle: l.doc.title,
-        listUrl: r.source ?? l.source,
-        creatorProfile: l.doc.creator.find((c) => c.platform === platform)?.profile,
-        firstSeen: r.firstSeen,
-        note: r.note,
-        via: viaOf(l),
-        attestedBy: via(l)?.attestedBy,
-      };
-      if (!out[hitId] || rank(v, isCreator) > rank(out[hitId]!, false)) out[hitId] = v;
+      offer(
+        hitId,
+        {
+          status: "not_mine",
+          listTitle: l.doc.title,
+          listUrl: r.source ?? l.source,
+          creatorProfile,
+          firstSeen: r.firstSeen,
+          note: r.note,
+          via: route?.via,
+          attestedBy: route?.attestedBy,
+          ...(tier === 2 ? { offProfile: true } : {}),
+        },
+        tier * 10 + 1,
+      );
     }
+    if (tier === 2) continue;
     for (const r of l.doc.mine) {
       if (r.platform !== platform) continue;
       const hitId = matchRow(r);
       if (!hitId) continue;
-      const v: Verdict = {
-        status: "verified",
-        listTitle: l.doc.title,
-        listUrl: l.source,
-        creatorProfile: l.doc.creator.find((c) => c.platform === platform)?.profile,
-        disclosure: r.disclosure,
-        via: viaOf(l),
-        attestedBy: via(l)?.attestedBy,
-      };
-      if (!out[hitId]) out[hitId] = v;
+      offer(
+        hitId,
+        {
+          status: "verified",
+          listTitle: l.doc.title,
+          listUrl: l.source,
+          creatorProfile,
+          disclosure: r.disclosure,
+          via: route?.via,
+          attestedBy: route?.attestedBy,
+        },
+        tier * 10,
+      );
     }
   }
 
-  // Likely accurate: released before the list's baseline cutoff, not yet confirmed either way.
+  // Likely accurate: released before the list's baseline cutoff, not yet confirmed either way. Same
+  // scope as a "mine" row, since it is a softer version of one.
   for (const l of lists) {
+    if (tierOf(l) === 2) continue;
     for (const r of l.doc.likely ?? []) {
       if (r.platform !== platform || !idSet.has(r.id) || out[r.id]) continue;
       out[r.id] = {
@@ -276,9 +307,9 @@ export async function lookup(
 }
 
 /**
- * Creator lists that claim this profile and have nothing corroborating it yet. The caller may check
- * them against the platform's bio to upgrade the route. Their rows render either way; a check that
- * passes only changes the card from "a list you added" to "checked against the artist's profile".
+ * Creator lists that claim this profile and have nothing corroborating that claim yet. The caller may
+ * check them against the profile's bio to upgrade the route. Their rows render either way; a check
+ * that passes only changes the card from "a list you added" to "checked against the artist's profile".
  */
 export async function unprovenClaims(platform: Platform, profileUrl: string): Promise<string[]> {
   const cache = await storage.get("listCache");
@@ -292,21 +323,17 @@ export async function unprovenClaims(platform: Platform, profileUrl: string): Pr
       (l) =>
         l.doc.type === "creator" &&
         claimsThisProfile(l.doc, platform, profileUrl) &&
-        !isCorroborated(routeFor(l, platform, claims, attested, false).via),
+        !isCorroborated(routeFor(l, platform, claims, attested, false, profileUrl).via),
     )
     .map((l) => l.source);
 }
 
+/**
+ * Do two URLs name the same profile? Compared by the id each platform's adapter parses out, never by
+ * the text of the URL: a suffix match let `https://anything.example/<real profile url>` claim the
+ * real profile, and lowercasing merged Spotify ids that differ only in case.
+ */
 export function sameProfile(a: string, b: string): boolean {
-  const norm = (u: string) =>
-    u
-      .toLowerCase()
-      .replace(/^https?:\/\//, "")
-      .replace(/^www\./, "")
-      .replace(/\/intl-[a-z]+\//, "/")
-      .replace(/[?#].*$/, "")
-      .replace(/\/+$/, "");
-  const na = norm(a);
-  const nb = norm(b);
-  return na === nb || na.endsWith(nb) || nb.endsWith(na);
+  const ia = profileIdentity(a);
+  return ia !== null && ia === profileIdentity(b);
 }

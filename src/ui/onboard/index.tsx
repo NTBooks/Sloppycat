@@ -274,9 +274,8 @@ function Wizard() {
     if (!doc || !detected || !result) return;
     setBusy("commit");
     try {
-      await storage.set("myList", doc);
       const profile: Profile = { platform: detected.platform, profileId: detected.profileId, url: detected.url, displayName: result.displayName, addedAt: new Date().toISOString() };
-      await send({ type: "snapshot:commit", profile, result });
+      await send({ type: "snapshot:commit", profile, result, myList: doc });
       setStep(2);
     } finally {
       setBusy("");

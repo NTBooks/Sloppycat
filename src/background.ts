@@ -1,35 +1,41 @@
-// Service worker: alarms, run loop, hidden-tab rendering, offscreen parsing, list refresh, messaging.
-import type { Alert, ExtractResult, ListChange, Message, Platform, Profile, RunState, SnapshotItem } from "./types";
-import { profileKey as keyOf, itemKey, isRunning, MAX_RUN_LOG } from "./types";
+// Service worker: alarms, the run loop, offscreen parsing, list refresh, messaging.
+// Reading pages in the background window lives in worker/hidden, the commentary in worker/runlog.
+import type { Alert, ExtractResult, ListDocument, Message, Platform, Profile, SnapshotItem } from "./types";
+import { profileKey as keyOf, itemKey } from "./types";
 import * as storage from "./storage";
 import { adapterFor, detectProfile, type FetchContext } from "./adapters";
 import { diffSnapshots } from "./diff";
-import { isGone, RENDER_CLOSED, RenderBudget } from "./render-guard";
 import { signalsFor, lookalikeSignal } from "./signals";
 import { addSource, ensureDefaultSources, refreshAll, lookup, unprovenClaims } from "./lists/sources";
 import { hasListAccess, hostOf } from "./lists/permissions";
-import { MAX_CHANGES, summarize } from "./lists/changes";
-import { verifyProfile, runClaimCheck } from "./lists/verify";
-import { getClaim, isFresh } from "./lists/claims";
+import { verifyProfile, runClaimCheck, type VerifyResult } from "./lists/verify";
+import { claimKey, getClaim, isFresh } from "./lists/claims";
 import { mergeCreatorDoc } from "./lists/format";
-import {
-  driftBetween,
-  pageRequest,
-  parseSpotifyCaptures,
-  pickPaginator,
-  type SpotifyCapture,
-} from "./adapters/spotify-json";
+import { driftBetween } from "./adapters/spotify-json";
+import { addAlerts, sameReleaseDateOrLater } from "./alerts";
+import { log, setRun } from "./worker/runlog";
+import { budget, closeHidden, closeOrphanHidden, extractFromTab, isHiddenTab, render, resume, stoppedByUser } from "./worker/hidden";
+import { notify, notifyListChanges, simulate } from "./worker/simulate";
 
 const ALARM_RUN = "sloppycat:run";
 const ALARM_LISTS = "sloppycat:lists";
 
 // ---------- scheduling ----------
 
-async function scheduleAlarms(): Promise<void> {
+/**
+ * @param firstInMinutes when the first check comes. A minute after the browser starts, so a check
+ *   happens even if the browser is never open for a full interval; a full interval after the user
+ *   changes the interval, since changing a setting is not asking for a check.
+ */
+async function scheduleRun(firstInMinutes?: number): Promise<void> {
   const settings = await storage.get("settings");
   const period = Math.max(15, settings.intervalMinutes);
   const jitter = period * (Math.random() * 0.2 - 0.1);
-  await chrome.alarms.create(ALARM_RUN, { delayInMinutes: 1, periodInMinutes: period + jitter });
+  await chrome.alarms.create(ALARM_RUN, { delayInMinutes: firstInMinutes ?? period, periodInMinutes: period + jitter });
+}
+
+async function scheduleAlarms(): Promise<void> {
+  await scheduleRun(1);
   await chrome.alarms.create(ALARM_LISTS, { delayInMinutes: 2, periodInMinutes: 360 });
 }
 
@@ -56,7 +62,14 @@ async function refreshLists(): Promise<void> {
   await notifyListChanges(changes);
 }
 
-storage.onChange(["settings"], () => void scheduleAlarms());
+// Only the interval moves the schedule. Settings is written for every toggle and for the GitHub token
+// too, and rescheduling on each of those started a full check a minute after flipping a switch.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes["settings"]) return;
+  const before = (changes["settings"].oldValue as { intervalMinutes?: number } | undefined)?.intervalMinutes;
+  const after = (changes["settings"].newValue as { intervalMinutes?: number } | undefined)?.intervalMinutes;
+  if (before !== after) void scheduleRun();
+});
 
 /**
  * Show one of the extension's own pages, reusing the tab it is already in. A notification per check
@@ -79,534 +92,6 @@ async function openPage(path: string): Promise<void> {
     await chrome.tabs.create({ url: hash ? `${url}#${hash}` : url });
   } catch (e) {
     console.error("Sloppycat: could not open", path, e);
-  }
-}
-
-// ---------- run commentary ----------
-
-/**
- * Append a line to the running commentary. Every page load, every wait and every result goes
- * through here, because the alternative is a window appearing with no explanation, which is a
- * window that gets closed.
- */
-async function log(text: string, bad = false): Promise<void> {
-  const at = new Date().toISOString();
-  await storage.update("runState", (cur) => {
-    // Lazily open one rather than dropping the line. Work started from the wizard is not a run, and
-    // a page load nobody narrates is a page load the user closes.
-    const base = cur && !cur.endedAt ? cur : { startedAt: at, queue: [], done: 0, log: [] };
-    return { ...base, beatAt: at, log: [...base.log, { at, text, bad }].slice(-MAX_RUN_LOG) };
-  });
-}
-
-/**
- * Narrate a piece of work that is not a scheduled run: a snapshot from the wizard, a claim check.
- * These open the same background window and take just as long, so they get the same commentary.
- */
-async function activity<T>(phase: string, fn: () => Promise<T>): Promise<T> {
-  const ours = !isRunning(await storage.get("runState"));
-  if (ours) {
-    const at = new Date().toISOString();
-    await storage.set("runState", { startedAt: at, beatAt: at, queue: [], done: 0, log: [], phase });
-    await log(phase);
-  }
-  try {
-    return await fn();
-  } catch (e) {
-    if (ours) await log(e instanceof Error ? e.message : String(e), true);
-    throw e;
-  } finally {
-    if (ours) {
-      await setRun(null);
-      await closeHidden();
-    }
-  }
-}
-
-// ---------- hidden-tab rendering ----------
-
-/**
- * Spotify and Amazon cannot be read without a real top-level page. Spotify's catalogue arrives in
- * the GraphQL calls the player makes with a token it mints per page load, and Amazon's author store
- * is JavaScript-rendered against the reader's own session. Neither can be framed: Amazon sends
- * `X-Frame-Options: SAMEORIGIN` and Spotify's CSP sets `frame-ancestors 'self'`, so an offscreen
- * document is not an option and a tab is the only thing left.
- *
- * So the tab is made as small a thing as possible: one reused tab, in one minimized popup window of
- * its own, never in a window the user is working in, closed again as soon as the run is done. If the
- * user closes it anyway, that is reported as what it is rather than as a failed check.
- */
-let renderQueue: Promise<unknown> = Promise.resolve();
-let hidden: { windowId: number; tabId: number } | undefined;
-let rendersInFlight = 0;
-
-const budget = new RenderBudget();
-
-/**
- * Is this message coming from the background tab the extension drives itself?
- *
- * Chrome stops the worker between events, which loses the ids held in memory while leaving the
- * window open, so they are mirrored into session storage and both are consulted. Getting this wrong
- * in the permissive direction is what lets a render loop start, so it errs the other way.
- */
-const HIDDEN_KEY = "sloppycat:hiddenTab";
-
-async function rememberHidden(v: { windowId: number; tabId: number } | undefined): Promise<void> {
-  try {
-    if (v) await chrome.storage.session.set({ [HIDDEN_KEY]: v });
-    else await chrome.storage.session.remove(HIDDEN_KEY);
-  } catch {
-    /* session storage is a nicety; the in-memory copy still covers the common case */
-  }
-}
-
-export async function isHiddenTab(tabId: number | undefined): Promise<boolean> {
-  if (tabId === undefined) return false;
-  if (hidden?.tabId === tabId) return true;
-  try {
-    const stored = (await chrome.storage.session.get(HIDDEN_KEY))[HIDDEN_KEY] as { tabId?: number } | undefined;
-    return stored?.tabId === tabId;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Close a background window left over from a previous worker. Without this, a worker restart during
- * a check orphans the window: nothing knows to close it, and nothing knows to ignore what its
- * content scripts say.
- */
-async function closeOrphanHidden(): Promise<void> {
-  try {
-    const stored = (await chrome.storage.session.get(HIDDEN_KEY))[HIDDEN_KEY] as { windowId?: number } | undefined;
-    if (stored?.windowId === undefined) return;
-    await rememberHidden(undefined);
-    await chrome.windows.remove(stored.windowId);
-  } catch {
-    /* already gone, which is the outcome we wanted */
-  }
-}
-
-async function getHiddenTab(): Promise<{ windowId: number; tabId: number }> {
-  if (idleTimer) {
-    clearTimeout(idleTimer);
-    idleTimer = undefined;
-  }
-  if (hidden) {
-    try {
-      // The tab is what gets navigated, so it is the one worth proving still exists.
-      await chrome.tabs.get(hidden.tabId);
-      return hidden;
-    } catch {
-      hidden = undefined;
-    }
-  }
-  await log("Opening a minimized background window to read pages in");
-  const w = await chrome.windows.create({ url: "about:blank", state: "minimized", focused: false, type: "popup" });
-  const tabId = w.tabs?.[0]?.id;
-  if (w.id === undefined || tabId === undefined) throw new Error("Could not open a background window to read the page in");
-  hidden = { windowId: w.id, tabId };
-  await rememberHidden(hidden);
-  return hidden;
-}
-
-/** How long the background window sticks around with nothing to do before it is closed. */
-const HIDDEN_IDLE_MS = 20_000;
-let idleTimer: ReturnType<typeof setTimeout> | undefined;
-
-/** Close the background window, so it is not left sitting in the taskbar between checks. */
-export async function closeHidden(): Promise<void> {
-  if (idleTimer) {
-    clearTimeout(idleTimer);
-    idleTimer = undefined;
-  }
-  if (rendersInFlight > 0 || !hidden) return;
-  const { windowId } = hidden;
-  hidden = undefined;
-  await rememberHidden(undefined);
-  try {
-    await chrome.windows.remove(windowId);
-  } catch {
-    /* the user got there first */
-  }
-}
-
-/**
- * Close it once the queue has been quiet for a moment. The run loop pauses a few seconds between
- * profiles, so closing the instant one render ends would mean opening a fresh window for every
- * profile instead of reusing one for the whole run.
- */
-function closeHiddenSoon(): void {
-  if (idleTimer) clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => {
-    idleTimer = undefined;
-    void closeHidden();
-  }, HIDDEN_IDLE_MS);
-}
-
-/**
- * Resolve when the tab finishes loading. Rejects as soon as the tab goes away, rather than waiting
- * out the timeout and then failing on the next call with a bare "No tab with id".
- */
-function waitForLoad(tabId: number, timeoutMs: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => finish(), timeoutMs);
-    function finish(err?: Error) {
-      clearTimeout(timer);
-      chrome.tabs.onUpdated.removeListener(onUpdated);
-      chrome.tabs.onRemoved.removeListener(onRemoved);
-      if (err) reject(err);
-      else resolve();
-    }
-    function onUpdated(id: number, info: chrome.tabs.TabChangeInfo) {
-      if (id === tabId && info.status === "complete") finish();
-    }
-    function onRemoved(id: number) {
-      if (id === tabId) finish(new Error(RENDER_CLOSED));
-    }
-    chrome.tabs.onUpdated.addListener(onUpdated);
-    chrome.tabs.onRemoved.addListener(onRemoved);
-  });
-}
-
-/** Read the Spotify responses captured in the page's MAIN world by content/spotify-capture. */
-async function readSpotifyCaptures(tabId: number): Promise<unknown[]> {
-  const [res] = await chrome.scripting.executeScript({
-    target: { tabId },
-    world: "MAIN",
-    func: () => (window as unknown as { __sloppycatCaps?: unknown[] }).__sloppycatCaps ?? [],
-  });
-  return (res?.result as unknown[]) ?? [];
-}
-
-async function waitForSpotifyCaptures(tabId: number, profileId: string, timeoutMs: number): Promise<unknown[]> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const caps = await readSpotifyCaptures(tabId);
-    const hit = caps.some((c) => (c as { data?: { artistUnion?: { id?: string } } })?.data?.artistUnion?.id === profileId);
-    if (hit) return caps;
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  return readSpotifyCaptures(tabId);
-}
-
-/**
- * The artist page hands over the newest 10 albums and 10 singles. When it also made a paginated
- * request we can re-issue, walk the rest of the catalog with the page's own short-lived credentials,
- * for the artist the user is already looking at.
- */
-async function pageThroughCatalog(caps: SpotifyCapture[], have: number): Promise<unknown[]> {
-  const paginator = pickPaginator(caps);
-  if (!paginator) return [];
-  const limit = Math.max(25, Number(paginator.variables[paginator.limitKey]) || 50);
-  const extra: unknown[] = [];
-  for (let offset = have, page = 0; page < 12; page++, offset += limit) {
-    const { url, init } = pageRequest(paginator, offset, limit);
-    let json: unknown;
-    try {
-      const res = await fetch(url, init);
-      if (!res.ok) break;
-      json = await res.json();
-    } catch {
-      break;
-    }
-    const before = extra.length;
-    extra.push(json);
-    // Stop as soon as a page adds nothing new.
-    const merged = parseSpotifyCaptures([...caps, ...extra], "", new Date().toISOString());
-    if (extra.length === before || !merged.items.length) break;
-    await new Promise((r) => setTimeout(r, 400));
-  }
-  return extra;
-}
-
-/**
- * @param driveThePage true only for the background tab, where operating the page's own controls
- *   (sorting a grid, expanding it) is ours to do. Never for a tab the reader has open.
- */
-export async function extractFromTab(
-  tabId: number,
-  platform: Platform,
-  profileId: string,
-  driveThePage = false,
-): Promise<ExtractResult> {
-  if (platform === "spotify" && !profileId.includes(":")) {
-    // Structured data first; the DOM is virtualized and only a fallback.
-    await log("Waiting for Spotify to hand over the catalogue (up to 12s)");
-    const caps = (await waitForSpotifyCaptures(tabId, profileId, 12000)) as SpotifyCapture[];
-    const now = new Date().toISOString();
-    let parsed = parseSpotifyCaptures(caps, profileId, now);
-    if (parsed.items.length) {
-      const counts = parsed.counts ?? {};
-      const total = counts["all"] ?? (counts["albums"] ?? 0) + (counts["singles"] ?? 0) + (counts["compilations"] ?? 0);
-      const own = parsed.items.filter((i) => i.kind !== "appears_on").length;
-      if (total > own) {
-        await log(`Spotify says ${total} releases and sent ${own}; paging through the rest`);
-        const extra = await pageThroughCatalog(caps, own);
-        if (extra.length) parsed = parseSpotifyCaptures([...caps, ...extra], profileId, now);
-      }
-      const seen = parsed.items.filter((i) => i.kind !== "appears_on").length;
-      parsed.partial = total > seen;
-      return parsed;
-    }
-  }
-  await log("Reading the page contents");
-  await chrome.scripting.executeScript({ target: { tabId }, files: ["content/extract.js"] });
-  const res = (await withTimeout(
-    chrome.tabs.sendMessage(tabId, { type: "extract:run", platform, profileId, driveThePage }),
-    EXTRACT_TIMEOUT_MS,
-    "Reading the page",
-  )) as { ok: true; result: ExtractResult } | { ok: false; error: string };
-  if (!res.ok) throw new Error(res.error);
-  return res.result;
-}
-
-/**
- * Give a promise a deadline. Loading the page had one and reading it did not, so a content script
- * that never answered left the check sitting on "Reading the page contents" for as long as the
- * browser stayed open, while the wizard promised it would stop by itself. It does now.
- */
-function withTimeout<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${what} gave up after ${Math.round(ms / 1000)}s`)), ms);
-    work.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e: unknown) => {
-        clearTimeout(timer);
-        reject(e instanceof Error ? e : new Error(String(e)));
-      },
-    );
-  });
-}
-
-/** A big catalogue is slow to read; nothing is slow for this long because it is working. */
-const EXTRACT_TIMEOUT_MS = 90_000;
-/** Everything one page can take: load, settle, read, and for Spotify paging the rest of it. */
-const RENDER_TIMEOUT_MS = 180_000;
-
-/**
- * Cover the background page with a sign saying whose window this is.
- *
- * Chrome gives an extension a popup window with no address bar and no tab strip, so what the user
- * sees is a chromeless Spotify with an unfamiliar icon in the taskbar: the exact shape of a phishing
- * window. The page underneath still has to load and still has to be read, so it is covered rather
- * than replaced, and the title and favicon are changed so the taskbar agrees with the window.
- *
- * Runs in the page, so it is self-contained: nothing here may refer to anything outside it.
- */
-function paint(heading: string, detail: string, iconUrl: string): void {
-  const ID = "sloppycat-curtain";
-  // Prefixed rather than replaced: the page's own title is evidence. Amazon serves a captcha as
-  // "Robot Check", and throwing that away would turn a challenge into a silent empty catalogue.
-  const mark = "Sloppycat is reading — ";
-  // Stripped before prefixing rather than guarded with startsWith: the sign is re-applied on every
-  // navigation event, two of which can read the title before either has written it, and the guard
-  // then passes twice. Doing it this way lands on the same answer however many times it runs.
-  let base = document.title;
-  while (base.startsWith(mark)) base = base.slice(mark.length);
-  document.title = mark + base;
-  // The favicon is what the taskbar shows, and Spotify's own makes this look like Spotify's window.
-  for (const l of Array.from(document.querySelectorAll("link[rel~='icon']"))) l.remove();
-  const icon = document.createElement("link");
-  icon.rel = "icon";
-  icon.href = iconUrl;
-  document.head?.appendChild(icon);
-
-  // Keyframes cannot be written inline, so the spinner needs a stylesheet. Added once.
-  if (!document.getElementById(ID + "-style")) {
-    const style = document.createElement("style");
-    style.id = ID + "-style";
-    style.textContent =
-      "@keyframes sloppycat-spin{to{transform:rotate(360deg)}}" +
-      "#" + ID + " .sc-spin{animation:sloppycat-spin 0.9s linear infinite}" +
-      "@media (prefers-reduced-motion:reduce){#" + ID + " .sc-spin{animation:none;opacity:0.6}}";
-    (document.head ?? document.documentElement).appendChild(style);
-  }
-
-  // Rebuilding on every navigation event churns the DOM, and the extractor decides a page has
-  // settled by watching for the DOM to go quiet. Saying the same thing again is not worth fighting
-  // it for, so an unchanged sign is left alone.
-  const stamp = `${heading}|${detail}`;
-  const existing = document.getElementById(ID);
-  if (existing && existing.dataset.sloppycatStamp === stamp) return;
-
-  let el = existing;
-  if (!el) {
-    el = document.createElement("div");
-    el.id = ID;
-    el.setAttribute("role", "status");
-    // Translucent, so the page being examined stays visible behind the sign. Seeing the work
-    // happen is what makes it read as deliberate rather than as something covering its tracks.
-    el.style.cssText = [
-      "position:fixed",
-      "inset:0",
-      "z-index:2147483647",
-      "background:rgba(9,9,11,0.72)",
-      "backdrop-filter:blur(2px)",
-      "-webkit-backdrop-filter:blur(2px)",
-      "display:flex",
-      "align-items:center",
-      "justify-content:center",
-      "padding:24px",
-      "font:14px/1.6 system-ui,-apple-system,Segoe UI,sans-serif",
-    ].join(";");
-    (document.body ?? document.documentElement).appendChild(el);
-  }
-  el.dataset.sloppycatStamp = stamp;
-  el.textContent = "";
-
-  const card = document.createElement("div");
-  card.style.cssText = [
-    "background:#131316",
-    "border:1px solid #2a2a30",
-    "border-radius:14px",
-    "box-shadow:0 18px 50px rgba(0,0,0,0.55)",
-    "padding:26px 30px",
-    "max-width:560px",
-    "display:flex",
-    "flex-direction:column",
-    "align-items:center",
-    "gap:10px",
-    "text-align:center",
-    "color:#f4f4f5",
-  ].join(";");
-  el.appendChild(card);
-
-  // Icon and spinner together: the spinner is the part that says this is still going.
-  const top = document.createElement("div");
-  top.style.cssText = "display:flex;align-items:center;gap:12px";
-  const img = document.createElement("img");
-  img.src = iconUrl;
-  img.alt = "";
-  img.width = 40;
-  img.height = 40;
-  top.appendChild(img);
-  const spin = document.createElement("div");
-  spin.className = "sc-spin";
-  spin.style.cssText =
-    "width:20px;height:20px;border-radius:50%;border:2px solid #3f3f46;border-top-color:#e8a33d;flex:none";
-  top.appendChild(spin);
-  card.appendChild(top);
-
-  // The name first. Someone who finds this window needs to know whose it is before anything else.
-  const brand = document.createElement("div");
-  brand.style.cssText = "font-size:19px;font-weight:650;letter-spacing:-0.01em";
-  brand.textContent = "Sloppycat";
-  card.appendChild(brand);
-
-  const where = document.createElement("div");
-  where.style.cssText =
-    "max-width:56ch;color:#a1a1aa;font-size:12px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all";
-  where.textContent = heading;
-  card.appendChild(where);
-
-  // One line. Whose window it is and that it goes away by itself is the whole message; why it is
-  // scanning is something the person who set it scanning already knows.
-  const d = document.createElement("div");
-  d.style.cssText = "color:#71717a;font-size:12px";
-  d.textContent = `${detail}. This window closes itself.`;
-  card.appendChild(d);
-}
-
-/**
- * Put the sign up, or change what it says. Cheap enough to call on every navigation event, which is
- * what it takes to beat the page's own paint: the window is on screen while the page loads.
- */
-async function showCurtain(tabId: number, heading: string, detail: string): Promise<void> {
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: paint,
-      args: [heading, detail, chrome.runtime.getURL("icons/icon-48.png")],
-      injectImmediately: true,
-    });
-  } catch {
-    // The page can be mid-navigation, or gone. The next event puts it up.
-  }
-}
-
-/**
- * Set when the user closes the background window. Closing it is an instruction, not a fault: the run
- * stops there rather than opening another one, and nothing reopens until the user asks again.
- */
-let abandoned = false;
-
-function render(url: string, platform: Platform, profileId: string): Promise<ExtractResult> {
-  const job = renderQueue.then(async () => {
-    if (abandoned) throw new Error(RENDER_CLOSED);
-    budget.spend();
-    rendersInFlight++;
-    try {
-      const { tabId } = await getHiddenTab();
-      // One reused tab rather than one per page: there is never a second tab to notice, and never a
-      // stray tab left behind if the worker is stopped between opening and closing it.
-      await log(`Loading ${short(url)}`);
-      const where = short(url);
-      const why = "Scanning";
-      // Re-applied on every navigation event for this tab: each one repaints the page and takes the
-      // sign with it. The listener goes at the end of the render.
-      const repaint = (id: number) => {
-        if (id === tabId) void showCurtain(tabId, where, why);
-      };
-      chrome.tabs.onUpdated.addListener(repaint);
-      try {
-        return await withTimeout(
-          (async () => {
-            await chrome.tabs.update(tabId, { url, active: false });
-            await showCurtain(tabId, where, why);
-            await waitForLoad(tabId, 20000);
-            await log("Page loaded, letting it settle");
-            await showCurtain(tabId, where, "Reading the page");
-            await new Promise((r) => setTimeout(r, 1500));
-            return await extractFromTab(tabId, platform, profileId, true);
-          })(),
-          RENDER_TIMEOUT_MS,
-          `Reading ${where}`,
-        );
-      } finally {
-        chrome.tabs.onUpdated.removeListener(repaint);
-      }
-    } catch (e) {
-      // There is deliberately no retry here. Reopening a window the user just closed is what made
-      // this feel like it was fighting them.
-      if (e instanceof Error && /gave up after/.test(e.message)) await log(e.message, true);
-      if (isGone(e)) {
-        abandoned = true;
-        hidden = undefined;
-        await rememberHidden(undefined);
-        await log("You closed the background window, so the check stopped here.");
-        throw new Error(RENDER_CLOSED);
-      }
-      throw e;
-    } finally {
-      rendersInFlight--;
-      // Park on a blank page rather than leave the profile running, then drop the window once the
-      // queue behind it is empty.
-      if (hidden && !abandoned) {
-        try {
-          await chrome.tabs.update(hidden.tabId, { url: "about:blank" });
-        } catch {
-          /* already gone */
-        }
-      }
-      closeHiddenSoon();
-    }
-  });
-  renderQueue = job.catch(() => undefined);
-  return job;
-}
-
-/** A page address short enough to read in a status line. */
-function short(url: string): string {
-  try {
-    const u = new URL(url);
-    const path = u.pathname.length > 40 ? `${u.pathname.slice(0, 39)}…` : u.pathname;
-    return `${u.host}${path}`;
-  } catch {
-    return url;
   }
 }
 
@@ -643,26 +128,51 @@ function ctx(): FetchContext {
   return { now: new Date().toISOString(), render, parseHtml };
 }
 
-// ---------- run loop ----------
+// ---------- who is using the background window ----------
 
+/**
+ * Two kinds of work open the background window: a check (the schedule or "Check now"), and a task
+ * (a wizard snapshot, a claim check from Settings). This is the one place that decides how they
+ * share it, which used to be split across several flags that disagreed:
+ *
+ * - A check does not start while a task is going. The schedule simply comes round again; a click
+ *   on "Check now" is told it did not run.
+ * - A task during a check rides along: its page loads join the check's queue and its lines join the
+ *   check's commentary.
+ * - Whichever finishes last, the check or the last task, ends the status and closes the window.
+ *
+ * Held in memory on purpose. Work happens in the worker and nowhere else, so a worker that holds no
+ * work is doing none; stored state is for the UI, and a worker Chrome killed leaves it stale.
+ */
 let running = false;
+let tasks = 0;
 
-/** Publish what the run is doing, so a click on "Check now" is visibly doing something. */
-async function setRun(patch: Partial<RunState> | null): Promise<void> {
-  if (patch === null) {
-    await storage.update("runState", (cur) => (cur ? { ...cur, endedAt: new Date().toISOString(), currentKey: undefined, currentLabel: undefined, phase: undefined } : cur));
-    return;
+async function activity<T>(phase: string, fn: () => Promise<T>): Promise<T> {
+  if (tasks++ === 0 && !running) {
+    // Asking for something is asking again, whatever happened to the window last time.
+    resume();
+    const at = new Date().toISOString();
+    await storage.set("runState", { startedAt: at, beatAt: at, queue: [], done: 0, log: [], phase });
   }
-  const beatAt = new Date().toISOString();
-  await storage.update("runState", (cur) => ({ ...(cur ?? { startedAt: beatAt, queue: [], done: 0, log: [] }), ...patch, beatAt }));
+  await log(phase);
+  try {
+    return await fn();
+  } catch (e) {
+    await log(e instanceof Error ? e.message : String(e), true);
+    throw e;
+  } finally {
+    if (--tasks === 0 && !running) {
+      await setRun(null);
+      await closeHidden();
+    }
+  }
 }
 
-export async function runAll(profileKeys?: string[]): Promise<void> {
-  // A second run while one is going would fight the first over the same background tab. This flag is
-  // the only authority on that: runs happen in the worker and nowhere else, so a worker that says it
-  // is not running is not running. The stored state is for the UI, and a run Chrome killed leaves it
-  // saying "running" forever; consulting it here would let that skip real checks.
-  if (running) return;
+// ---------- run loop ----------
+
+/** Check the given profiles, or all of them. Resolves false when another piece of work is going. */
+export async function runAll(profileKeys?: string[]): Promise<boolean> {
+  if (running || tasks > 0) return false;
   running = true;
   try {
     const settings = await storage.get("settings");
@@ -671,7 +181,7 @@ export async function runAll(profileKeys?: string[]): Promise<void> {
     const startedAt = new Date().toISOString();
     await storage.set("runState", { startedAt, beatAt: startedAt, queue, done: 0, log: [] });
     budget.startRun(queue.length);
-    abandoned = false;
+    resume();
     const counter = await storage.update("runCounter", (n) => n + 1);
     // Lookalike search is opt-in: it reads titles, not provenance, so most of what it finds is a
     // coincidence rather than a hijack.
@@ -684,27 +194,30 @@ export async function runAll(profileKeys?: string[]): Promise<void> {
       await log(`${p.displayName ?? p.profileId} on ${adapterFor(p.platform).label}`);
       await runProfile(p, doLookalike);
       await setRun({ done: (await storage.get("runState"))!.done + 1 });
-      if (abandoned) {
+      if (stoppedByUser()) {
         await log("Stopping here. Run the check again when you are ready.", true);
         break;
       }
       if (key !== queue[queue.length - 1]) await new Promise((r) => setTimeout(r, 2000 + Math.random() * 3000));
     }
-    if (!abandoned) {
+    if (!stoppedByUser()) {
       await setRun({ currentKey: undefined, currentLabel: undefined, phase: "Checking claims on the lists you subscribe to" });
       for (const key of queue) {
         const p = profiles[key];
         if (p) await proveClaimsFor(p.platform, p.url);
-        if (abandoned) break;
+        if (stoppedByUser()) break;
       }
     }
-    await log(abandoned ? "Check stopped." : "Check finished.");
+    await log(stoppedByUser() ? "Check stopped." : "Check finished.");
+    return true;
   } finally {
     running = false;
     budget.endRun();
-    await setRun(null);
-    // The window exists for the run; when the run is over it has no reason to still be there.
-    await closeHidden();
+    // The window exists for the work; when none is left it has no reason to still be there.
+    if (tasks === 0) {
+      await setRun(null);
+      await closeHidden();
+    }
   }
 }
 
@@ -775,16 +288,22 @@ async function findTheirList(profile: Profile, bio: string | undefined): Promise
  * Look for the user's own list in the profile bio, as part of the check rather than as a button
  * they have to know to press. The page is already open at this point, so it is free.
  */
-async function checkOwnList(profile: Profile, bio: string | undefined): Promise<void> {
-  const key = keyOf(profile);
+async function checkOwnList(profile: Profile, bio: string | undefined): Promise<VerifyResult> {
   const who = profile.displayName ?? profile.profileId;
   await log(`${who}: looking for your list link in the bio`);
-  const v = await verifyProfile(profile, bio);
-  await storage.update("profiles", (all) => ({
-    ...all,
-    [key]: { ...all[key]!, verified: v.ok, verifiedListUrl: v.ok ? v.listUrl : undefined },
-  }));
+  const v = await storeOwnListCheck(profile, bio);
   await log(v.ok ? `${who}: list link found and it names this profile` : `${who}: ${v.reason ?? "no list link yet"}`, !v.ok);
+  return v;
+}
+
+/** The check itself, recorded on the profile. The one place a profile's `verified` is written. */
+async function storeOwnListCheck(profile: Profile, bio: string | undefined): Promise<VerifyResult> {
+  const key = keyOf(profile);
+  const v = await verifyProfile(profile, bio);
+  await storage.update("profiles", (all) =>
+    all[key] ? { ...all, [key]: { ...all[key]!, verified: v.ok, verifiedListUrl: v.ok ? v.listUrl : undefined } } : all,
+  );
+  return v;
 }
 
 /** Store the snapshot, diff against the previous one, raise alerts. Shared by polling and the wizard. */
@@ -820,7 +339,8 @@ export async function ingestSnapshot(profile: Profile, result: ExtractResult, do
    * survives the window changing size between checks, which it will.
    */
   const newestKnown = (prev?.items ?? []).reduce((a, i) => (i.releaseDate && i.releaseDate > a ? i.releaseDate : a), "");
-  const worthAlerting = (i: SnapshotItem) => trusted || (!!result.newestFirst && !!i.releaseDate && i.releaseDate >= newestKnown);
+  const worthAlerting = (i: SnapshotItem) =>
+    trusted || (!!result.newestFirst && !!i.releaseDate && sameReleaseDateOrLater(i.releaseDate, newestKnown));
   if (!trusted) {
     await log(
       result.newestFirst
@@ -923,62 +443,12 @@ export async function ingestSnapshot(profile: Profile, result: ExtractResult, do
   }
 
   if (newAlerts.length) {
-    await storage.update("alerts", (all) => {
-      const next = { ...all };
-      for (const a of newAlerts) next[a.id] = a;
-      return next;
-    });
+    await addAlerts(newAlerts);
     await notify(profile, newAlerts);
   }
-
-  // Verification: a bio that links to a list which names this profile.
-  if (result.bio !== undefined || profile.verified === undefined) {
-    const v = await verifyProfile({ ...profile, displayName: result.displayName ?? profile.displayName }, result.bio);
-    await storage.update("profiles", (all) => ({
-      ...all,
-      [key]: { ...all[key]!, verified: v.ok, verifiedListUrl: v.ok ? v.listUrl : all[key]?.verifiedListUrl },
-    }));
-  }
+  // The list link in the bio is checked by the callers, once each: a check does it after this, and
+  // the wizard's commit does it itself. Doing it here as well read the same list two or three times.
   return newAlerts;
-}
-
-async function notify(profile: Profile, alerts: Alert[]): Promise<void> {
-  const settings = await storage.get("settings");
-  if (!settings.notifications) return;
-  const first = alerts[0]!;
-  const who = profile.displayName ?? profile.url;
-  const title = alerts.length === 1 ? `New item on ${who}` : `${alerts.length} new items on ${who}`;
-  const message =
-    alerts.length === 1
-      ? `"${first.item.title}"${first.signals.length ? " · " + first.signals.length + " signal(s)" : ""}`
-      : alerts.map((a) => a.item.title).slice(0, 3).join(", ");
-  await chrome.notifications.create(`alert:${first.id}`, {
-    type: "basic",
-    iconUrl: chrome.runtime.getURL("icons/icon-128.png"),
-    title,
-    message,
-    priority: 2,
-  });
-}
-
-/**
- * One notification per refresh, not one per row: a community list can add fifty things at once, and
- * fifty toasts would teach people to turn the whole thing off.
- */
-async function notifyListChanges(changes: ListChange[]): Promise<void> {
-  if (!changes.length) return;
-  const settings = await storage.get("settings");
-  // Gated on its own toggle only: watching pages without badging them is what following an artist
-  // looks like, and that is exactly when a list you subscribe to changing its mind matters.
-  if (!settings.notifications || !settings.listUpdates) return;
-  const { title, message } = summarize(changes);
-  await chrome.notifications.create(`lists:${changes[0]!.id}`, {
-    type: "basic",
-    iconUrl: chrome.runtime.getURL("icons/icon-128.png"),
-    title,
-    message,
-    priority: 1,
-  });
 }
 
 chrome.notifications.onClicked.addListener((id) => {
@@ -995,7 +465,7 @@ chrome.notifications.onClicked.addListener((id) => {
 
 let proving = new Set<string>();
 
-/** Verify any unproven claim over the profile the viewer is looking at, one at a time. */
+/** Check each unproven list claiming this profile against the profile's own bio, one at a time. */
 async function proveClaimsFor(platform: Platform, profileUrl: string): Promise<void> {
   let pending: string[];
   try {
@@ -1004,13 +474,13 @@ async function proveClaimsFor(platform: Platform, profileUrl: string): Promise<v
     return;
   }
   for (const listUrl of pending) {
-    const key = `${listUrl}|${platform}`;
+    const key = `${listUrl}|${platform}|${profileUrl}`;
     if (proving.has(key)) continue;
-    const existing = await getClaim(listUrl, platform);
+    const existing = await getClaim(listUrl, platform, profileUrl);
     if (isFresh(existing)) continue; // already checked recently, good or bad
     proving.add(key);
     try {
-      await runClaimCheck(listUrl, platform, ctx());
+      await runClaimCheck(listUrl, platform, profileUrl, ctx());
     } catch {
       /* a failed check just leaves the list untrusted */
     } finally {
@@ -1027,13 +497,14 @@ async function resolveAlert(
   disclosure?: Record<string, string>,
   note?: string,
 ): Promise<void> {
-  const alerts = await storage.get("alerts");
-  const a = alerts[alertId];
-  if (!a) return;
-  a.resolution = resolution;
-  a.resolvedAt = new Date().toISOString();
-  await storage.set("alerts", { ...alerts, [alertId]: a });
-  if (resolution === "dismissed") return;
+  let a: Alert | undefined;
+  await storage.update("alerts", (all) => {
+    const cur = all[alertId];
+    if (!cur) return all;
+    a = { ...cur, resolution, resolvedAt: new Date().toISOString() };
+    return { ...all, [alertId]: a };
+  });
+  if (!a || resolution === "dismissed") return;
 
   const profiles = await storage.get("profiles");
   const p = profiles[a.profileKey];
@@ -1076,9 +547,7 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         // going: the caller asked for a check and did not get one, and should be told so rather
         // than left reading a snapshot that was never taken.
         const m = msg as Extract<Message, { type: "run:now" }>;
-        if (running) return { ok: true, ran: false };
-        await runAll(m.profileKey ? [m.profileKey] : undefined);
-        return { ok: true, ran: true };
+        return { ok: true, ran: await runAll(m.profileKey ? [m.profileKey] : undefined) };
       }
       case "profile:add": {
         const m = msg as Extract<Message, { type: "profile:add" }>;
@@ -1144,14 +613,9 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         if (!p) return { ok: false, error: "Unknown profile" };
         const adapter = adapterFor(p.platform);
         return activity(`Looking for your list link on ${adapter.label}`, async () => {
-        const result = await adapter.fetchSnapshot(p.profileId, ctx(), { withBio: true });
-        const v = await verifyProfile(p, result.bio);
-        await storage.update("profiles", (all) => ({
-          ...all,
-          [m.profileKey]: { ...all[m.profileKey]!, verified: v.ok, verifiedListUrl: v.ok ? v.listUrl : undefined },
-        }));
-        await log(v.ok ? "Your bio links to your list and the list names this profile" : (v.reason ?? "Not verified"), !v.ok);
-        return { ok: v.ok, reason: v.reason, listUrl: v.listUrl };
+          const result = await adapter.fetchSnapshot(p.profileId, ctx(), { withBio: true });
+          const v = await checkOwnList(p, result.bio);
+          return { ok: v.ok, reason: v.reason, listUrl: v.listUrl };
         });
       }
       case "snapshot:fromTab": {
@@ -1173,6 +637,11 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
             result = await extractFromTab(m.tabId, det.platform, det.profileId);
             if (!result.items.length) {
               await log("Nothing on that tab yet, opening the profile in the background instead");
+              result = await adapter.fetchSnapshot(det.profileId, ctx(), { withBio: true });
+            } else if (result.partial && det.platform === "spotify") {
+              // Paging past Spotify's first twenty takes the page's login tokens, which are only
+              // kept on a page the extension opened itself, never on one the user has open.
+              await log("That tab only shows the newest releases, reading the rest in the background");
               result = await adapter.fetchSnapshot(det.profileId, ctx(), { withBio: true });
             }
           }
@@ -1233,95 +702,14 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         });
         return { ok: true, links: (res?.result as { href: string; text: string }[]) ?? [] };
       }
-      case "dev:simulate": {
-        // Testing aid: plant something on a watched profile so the whole alert path can be exercised
-        // without waiting for a real hijack, or owning a catalogue for one to happen to.
-        const m = msg as Extract<Message, { type: "dev:simulate" }>;
-
-        if (m.kind === "listupdate") {
-          // The consumer half of the same aid: a subscribed list saying something new, without
-          // waiting six hours for a refresh or asking an artist to edit their file for you.
-          const sources = await storage.get("listSources");
-          const src = sources.find((s) => s.enabled);
-          const change: ListChange = {
-            id: crypto.randomUUID(),
-            at: new Date().toISOString(),
-            source: src?.url ?? "local:test",
-            listTitle: src?.title ?? "A list you subscribe to",
-            listType: src?.type ?? "community",
-            kind: "verified",
-            platform: "spotify",
-            itemId: `test${Math.random().toString(36).slice(2, 8)}`,
-            title: "Midnight Jazz Vibes (test) — confirmed by the creator",
-            seen: false,
-          };
-          await storage.update("listChanges", (cur) => [change, ...cur].slice(0, MAX_CHANGES));
-          await notifyListChanges([change]);
-          return { ok: true };
-        }
-
-        const profiles = await storage.get("profiles");
-        const profile = m.profileKey ? profiles[m.profileKey] : Object.values(profiles)[0];
-        if (!profile) return { ok: false, error: "Watch a profile first, then simulate against it." };
-        const pk = keyOf(profile);
-        const stamp = new Date().toISOString();
-        const suffix = Math.random().toString(36).slice(2, 8);
-        const adapter = adapterFor(profile.platform);
-
-        if (m.kind === "drift") {
-          const snaps = await storage.get("snapshots");
-          const snap = snaps[pk];
-          const counts = { ...(snap?.counts ?? { singles: 10 }) };
-          const category = Object.keys(counts)[0] ?? "singles";
-          const alert: Alert = {
-            id: crypto.randomUUID(),
-            profileKey: pk,
-            createdAt: stamp,
-            change: "count_drift",
-            signals: [{ kind: "count_drift", category, added: 3, seen: 0 }],
-            item: {
-              platform: profile.platform,
-              itemId: `counts:${category}`,
-              title: `3 more ${category} than last time, and none of them are visible`,
-              kind: "unknown",
-              url: `${profile.url}/discography/all`,
-              firstSeen: stamp,
-              source: "profile",
-            },
-          };
-          await storage.update("alerts", (all) => ({ ...all, [alert.id]: alert }));
-          await notify(profile, [alert]);
-          return { ok: true };
-        }
-
-        const fake: SnapshotItem = {
-          platform: profile.platform,
-          itemId: profile.platform === "amazon" ? `B0TEST${suffix.toUpperCase().slice(0, 4)}` : `test${suffix}`,
-          title: m.kind === "lookalike" ? "Test Release: Summary & Analysis" : "Midnight Jazz Vibes (test)",
-          subtitle: profile.displayName,
-          kind: profile.platform === "amazon" || profile.platform === "goodreads" ? "book" : "single",
-          releaseDate: stamp.slice(0, 10),
-          label: profile.platform === "amazon" ? "Independently published" : "8412 Records DK",
-          url: adapter.itemUrl(profile.platform === "amazon" ? "B0TESTFAKE" : "testfake"),
-          meta: { simulated: true, reviewCount: 0 },
-          firstSeen: stamp,
-          source: m.kind === "lookalike" ? "search" : "profile",
-        };
-        const snapshots = await storage.get("snapshots");
-        const history = snapshots[pk]?.items ?? [];
-        const alert: Alert = {
-          id: crypto.randomUUID(),
-          profileKey: pk,
-          createdAt: stamp,
-          change: m.kind === "lookalike" ? "lookalike" : "added",
-          item: fake,
-          signals:
-            m.kind === "lookalike"
-              ? [{ kind: "lookalike", ofTitle: history[0]?.title ?? "Your title", score: 0.93 }, ...signalsFor(fake, history)]
-              : signalsFor(fake, history),
-        };
-        await storage.update("alerts", (all) => ({ ...all, [alert.id]: alert }));
-        await notify(profile, [alert]);
+      case "dev:simulate":
+        return simulate(msg as Extract<Message, { type: "dev:simulate" }>);
+      case "alerts:clear":
+        await storage.set("alerts", {});
+        return { ok: true };
+      case "myList:set": {
+        const m = msg as Extract<Message, { type: "myList:set" }>;
+        await storage.set("myList", m.doc);
         return { ok: true };
       }
       case "offscreen:parse":
@@ -1341,9 +729,13 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type !== "snapshot:commit") return;
   (async () => {
-    const { profile, result } = msg as { profile: Profile; result: ExtractResult };
+    const { profile, result, myList } = msg as { profile: Profile; result: ExtractResult; myList?: ListDocument };
+    // The worker writes these itself, so pages hand them over rather than writing them alongside it.
+    if (myList) await storage.set("myList", myList);
     await storage.update("profiles", (all) => ({ ...all, [keyOf(profile)]: { ...profile, ...(all[keyOf(profile)] ?? {}) } }));
     await ingestSnapshot(profile, result, false);
+    const stored = (await storage.get("profiles"))[keyOf(profile)] ?? profile;
+    if (!stored.watchOnly) await storeOwnListCheck(stored, result.bio);
     sendResponse({ ok: true });
   })().catch((e: unknown) => sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) }));
   return true;
@@ -1355,6 +747,11 @@ void (async () => {
   await closeOrphanHidden();
   // A run this worker is not doing is not running, whatever the last worker left behind.
   await storage.update("runState", (cur) => (cur && !cur.endedAt ? { ...cur, endedAt: new Date().toISOString() } : cur));
+  // Claims were once stored per list and platform. Those say nothing about any one profile, so they
+  // go, and the next check proves each profile afresh.
+  await storage.update("claims", (all) =>
+    Object.fromEntries(Object.entries(all).filter(([k, c]) => c.profileUrl && k === claimKey(c.listUrl, c.platform, c.profileUrl))),
+  );
   const existing = await chrome.alarms.get(ALARM_RUN);
   if (!existing) await scheduleAlarms();
 })();

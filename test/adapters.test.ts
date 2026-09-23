@@ -45,9 +45,28 @@ describe("list URL discovery", () => {
   it("normalizes blob URLs to raw", () => {
     expect(normalizeListUrl("https://github.com/jd/site/blob/main/sloppycat.md")).toBe("https://raw.githubusercontent.com/jd/site/main/sloppycat.md");
   });
+  const A = "4Z8W4fKeB5YxbusRsdQVPb";
   it("matches profiles across URL variants", () => {
-    expect(sameProfile("https://open.spotify.com/artist/abc", "https://open.spotify.com/intl-fr/artist/abc?si=1")).toBe(true);
-    expect(sameProfile("https://open.spotify.com/artist/abc", "https://open.spotify.com/artist/xyz")).toBe(false);
+    expect(sameProfile(`https://open.spotify.com/artist/${A}`, `https://open.spotify.com/intl-fr/artist/${A}?si=1`)).toBe(true);
+    expect(sameProfile(`https://open.spotify.com/artist/${A}`, "https://open.spotify.com/artist/0123456789abcdefghijkl")).toBe(false);
+    expect(sameProfile("https://www.goodreads.com/author/show/123.Jane_Doe", "https://goodreads.com/author/show/123")).toBe(true);
+  });
+
+  // The old comparison accepted any URL ending in the real one, so a list could name a page on its
+  // own site and be read as claiming the artist's profile.
+  it("does not let a URL on another host stand in for the profile", () => {
+    expect(sameProfile(`https://anything.example/open.spotify.com/artist/${A}`, `https://open.spotify.com/artist/${A}`)).toBe(false);
+    expect(sameProfile(`https://evilspotify.com/artist/${A}`, `https://open.spotify.com/artist/${A}`)).toBe(false);
+    expect(detectProfile(`https://anything.example/open.spotify.com/artist/${A}`)).toBeNull();
+    expect(detectProfile("https://amazon.evil.example/stores/author/B001IGFHW6")).toBeNull();
+  });
+
+  it("keeps Spotify ids case-sensitive, as Spotify does", () => {
+    expect(sameProfile(`https://open.spotify.com/artist/${A}`, `https://open.spotify.com/artist/${A.toLowerCase()}`)).toBe(false);
+  });
+
+  it("never matches something that is not a profile, even to itself", () => {
+    expect(sameProfile("https://example.test/jane", "https://example.test/jane")).toBe(false);
   });
 });
 
