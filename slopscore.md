@@ -6,7 +6,7 @@ human_touch: heavy
 content_rating: everyone
 contains: [scraping, legal]
 category: [extension, automation, media]
-status: beta
+status: alpha
 tagline: Artists say what is theirs. Everyone else gets to see it.
 built_with: [claude-code, claude]
 models: [claude-opus-5]
