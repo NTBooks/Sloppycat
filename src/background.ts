@@ -343,12 +343,40 @@ export async function extractFromTab(tabId: number, platform: Platform, profileI
   }
   await log("Reading the page contents");
   await chrome.scripting.executeScript({ target: { tabId }, files: ["content/extract.js"] });
-  const res = (await chrome.tabs.sendMessage(tabId, { type: "extract:run", platform, profileId })) as
-    | { ok: true; result: ExtractResult }
-    | { ok: false; error: string };
+  const res = (await withTimeout(
+    chrome.tabs.sendMessage(tabId, { type: "extract:run", platform, profileId }),
+    EXTRACT_TIMEOUT_MS,
+    "Reading the page",
+  )) as { ok: true; result: ExtractResult } | { ok: false; error: string };
   if (!res.ok) throw new Error(res.error);
   return res.result;
 }
+
+/**
+ * Give a promise a deadline. Loading the page had one and reading it did not, so a content script
+ * that never answered left the check sitting on "Reading the page contents" for as long as the
+ * browser stayed open, while the wizard promised it would stop by itself. It does now.
+ */
+function withTimeout<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${what} gave up after ${Math.round(ms / 1000)}s`)), ms);
+    work.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e: unknown) => {
+        clearTimeout(timer);
+        reject(e instanceof Error ? e : new Error(String(e)));
+      },
+    );
+  });
+}
+
+/** A big catalogue is slow to read; nothing is slow for this long because it is working. */
+const EXTRACT_TIMEOUT_MS = 90_000;
+/** Everything one page can take: load, settle, read, and for Spotify paging the rest of it. */
+const RENDER_TIMEOUT_MS = 180_000;
 
 /**
  * Cover the background page with a sign saying whose window this is.
@@ -365,7 +393,12 @@ function paint(heading: string, detail: string, iconUrl: string): void {
   // Prefixed rather than replaced: the page's own title is evidence. Amazon serves a captcha as
   // "Robot Check", and throwing that away would turn a challenge into a silent empty catalogue.
   const mark = "Sloppycat is reading — ";
-  if (!document.title.startsWith(mark)) document.title = mark + document.title;
+  // Stripped before prefixing rather than guarded with startsWith: the sign is re-applied on every
+  // navigation event, two of which can read the title before either has written it, and the guard
+  // then passes twice. Doing it this way lands on the same answer however many times it runs.
+  let base = document.title;
+  while (base.startsWith(mark)) base = base.slice(mark.length);
+  document.title = mark + base;
   // The favicon is what the taskbar shows, and Spotify's own makes this look like Spotify's window.
   for (const l of Array.from(document.querySelectorAll("link[rel~='icon']"))) l.remove();
   const icon = document.createElement("link");
@@ -503,19 +536,26 @@ function render(url: string, platform: Platform, profileId: string): Promise<Ext
       };
       chrome.tabs.onUpdated.addListener(repaint);
       try {
-        await chrome.tabs.update(tabId, { url, active: false });
-        await showCurtain(tabId, where, why);
-        await waitForLoad(tabId, 20000);
-        await log("Page loaded, letting it settle");
-        await showCurtain(tabId, where, "Reading the page");
-        await new Promise((r) => setTimeout(r, 1500));
-        return await extractFromTab(tabId, platform, profileId);
+        return await withTimeout(
+          (async () => {
+            await chrome.tabs.update(tabId, { url, active: false });
+            await showCurtain(tabId, where, why);
+            await waitForLoad(tabId, 20000);
+            await log("Page loaded, letting it settle");
+            await showCurtain(tabId, where, "Reading the page");
+            await new Promise((r) => setTimeout(r, 1500));
+            return await extractFromTab(tabId, platform, profileId);
+          })(),
+          RENDER_TIMEOUT_MS,
+          `Reading ${where}`,
+        );
       } finally {
         chrome.tabs.onUpdated.removeListener(repaint);
       }
     } catch (e) {
       // There is deliberately no retry here. Reopening a window the user just closed is what made
       // this feel like it was fighting them.
+      if (e instanceof Error && /gave up after/.test(e.message)) await log(e.message, true);
       if (isGone(e)) {
         abandoned = true;
         hidden = undefined;

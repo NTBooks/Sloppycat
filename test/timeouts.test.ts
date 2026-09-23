@@ -1,0 +1,65 @@
+import { describe, expect, it, vi } from "vitest";
+
+/**
+ * The same shape as the worker's withTimeout. Kept here rather than imported because background.ts
+ * touches chrome.* at module scope; what is being pinned is the contract, not the copy.
+ */
+function withTimeout<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${what} gave up after ${Math.round(ms / 1000)}s`)), ms);
+    work.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e: unknown) => {
+        clearTimeout(timer);
+        reject(e instanceof Error ? e : new Error(String(e)));
+      },
+    );
+  });
+}
+
+describe("withTimeout", () => {
+  // A content script that never answers used to leave the check on "Reading the page contents"
+  // for as long as the browser stayed open, while the wizard said it would stop by itself.
+  it("gives up on work that never finishes, and says how long it waited", async () => {
+    vi.useFakeTimers();
+    const never = new Promise<string>(() => {});
+    const p = withTimeout(never, 90_000, "Reading the page");
+    const assertion = expect(p).rejects.toThrow(/Reading the page gave up after 90s/);
+    await vi.advanceTimersByTimeAsync(90_001);
+    await assertion;
+    vi.useRealTimers();
+  });
+
+  it("lets work that finishes in time through untouched", async () => {
+    await expect(withTimeout(Promise.resolve("catalogue"), 1000, "Reading")).resolves.toBe("catalogue");
+  });
+
+  it("passes the real failure through rather than replacing it with a deadline", async () => {
+    await expect(withTimeout(Promise.reject(new Error("Bot challenge")), 1000, "Reading")).rejects.toThrow("Bot challenge");
+  });
+});
+
+describe("the background window's title prefix", () => {
+  const mark = "Sloppycat is reading — ";
+  const applyPrefix = (title: string): string => {
+    let base = title;
+    while (base.startsWith(mark)) base = base.slice(mark.length);
+    return mark + base;
+  };
+
+  // The sign is re-applied on every navigation event, and two can read the title before either
+  // writes it. A startsWith guard passes twice and you get the prefix stamped on twice.
+  it("says it once however many times it runs", () => {
+    const once = applyPrefix("Stephen King: All Books");
+    expect(once).toBe("Sloppycat is reading — Stephen King: All Books");
+    expect(applyPrefix(once)).toBe(once);
+    expect(applyPrefix(applyPrefix(once))).toBe(once);
+  });
+
+  it("keeps the page's own title, which the captcha check reads", () => {
+    expect(applyPrefix("Robot Check")).toContain("Robot Check");
+  });
+});
