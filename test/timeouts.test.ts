@@ -86,3 +86,20 @@ describe("Amazon's Show more expansion is bounded by the clock", () => {
     expect(RESPOND_BY_MS).toBeLessThan(EXTRACT_TIMEOUT_MS);
   });
 });
+
+describe("a partial read must not manufacture new releases", () => {
+  // 288 of 1808 Stephen King titles came back. If the next read loads a different 288, every
+  // newly-loaded back-catalogue book looks new. Calling a real release fake is the failure mode
+  // the project says kills it, so a read that admits it is partial has to be handled differently
+  // from one that claims to be whole.
+  const added = (before: string[], after: string[]) => after.filter((x) => !before.includes(x));
+
+  it("shows the danger: a different window reads as additions", () => {
+    expect(added(["a", "b", "c"], ["b", "c", "d"])).toEqual(["d"]);
+  });
+
+  it("is defused by keeping what was already known", () => {
+    const merged = [...new Set([...["a", "b", "c"], ...["b", "c", "d"]])];
+    expect(added(merged, ["b", "c", "d"])).toEqual([]);
+  });
+});

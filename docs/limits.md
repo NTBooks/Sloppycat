@@ -69,6 +69,15 @@ keyless daily quota is shared by everyone calling it that way, so it returns HTT
 fault of yours. That surfaces as an error on the profile rather than an empty catalogue, which is the
 important part: it never reads as "this author has no books". Checked 2026-09-22, when it was over quota.
 
+**A catalogue too long to read is read as far as it goes, and then trusted for nothing.** Amazon's author
+grid loads sixteen at a time behind a "Show more" button, so an author with eighteen hundred titles takes
+longer to expand than a check is willing to spend: it stops after forty-five seconds with a few hundred. A
+read that stopped early says so, and a read that says so adds what it found to what was already known
+instead of replacing it, and raises no alerts at all. Comparing one window against a different window would
+report whichever books happened to load this time as newly published, and calling a real release fake is the
+one mistake this is not allowed to make. The practical effect is that very long catalogues are recorded but
+not monitored.
+
 **Catalogue depth is capped per platform.** Apple's lookup returns up to 200 collections, Deezer paging stops
 at 1000 albums, the Goodreads adapter reads 10 pages of 30. Prolific back catalogues will exceed those and
 need paging work. Only Spotify reports a total to compare against, so only Spotify can tell you it saw fewer

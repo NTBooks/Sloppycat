@@ -211,9 +211,15 @@ function Following() {
             setErr("");
             setBusy(true);
             try {
-              const r = await send<{ ok: boolean; error?: string }>({ type: "profile:add", url, watchOnly: true });
+              const r = await send<{ ok: boolean; error?: string; profileKey?: string }>({ type: "profile:add", url, watchOnly: true });
               if (!r.ok) setErr(r.error ?? "Could not add that one");
-              else setUrl("");
+              else {
+                setUrl("");
+                // Adding no longer reads the page by itself, so ask for it. If a check is already
+                // running this one waits for the next, rather than running alongside it.
+                const kicked = await send<{ ran?: boolean }>({ type: "run:now", profileKey: r.profileKey });
+                if (kicked.ran === false) setErr("Added. A check is already running, so this page is read on the next one.");
+              }
             } finally {
               setBusy(false);
             }

@@ -791,7 +791,25 @@ export async function ingestSnapshot(profile: Profile, result: ExtractResult, do
 
   // Preserve firstSeen from the previous snapshot.
   const prevMap = new Map((prev?.items ?? []).map((i) => [i.itemId, i]));
-  const items = result.items.map((i) => ({ ...i, firstSeen: prevMap.get(i.itemId)?.firstSeen ?? i.firstSeen }));
+  const read = result.items.map((i) => ({ ...i, firstSeen: prevMap.get(i.itemId)?.firstSeen ?? i.firstSeen }));
+
+  /**
+   * A read that did not reach the end of the catalogue cannot be compared against one that did.
+   * Amazon hands over its grid sixteen at a time and an author with eighteen hundred titles is not
+   * going to fit; Spotify says outright when it sent fewer than it has. Diffing a window against a
+   * window reports whatever happened to load this time as newly published, and calling a real
+   * release fake is the failure this project does not get to make twice.
+   *
+   * So a partial read adds to what is known rather than replacing it, and raises nothing. The
+   * baseline only grows, and a complete read later compares against all of it.
+   */
+  const trusted = !result.partial;
+  const items = trusted ? read : [...read, ...(prev?.items ?? []).filter((o) => !read.some((n) => n.itemId === o.itemId))];
+  if (!trusted) {
+    await log(
+      `${profile.displayName ?? profile.profileId}: read ${read.length} of a longer list, so nothing here counts as new`,
+    );
+  }
   await storage.update("snapshots", (all) => ({
     ...all,
     [key]: { profileKey: key, takenAt: c.now, items, counts: result.counts ?? prev?.counts },
@@ -825,7 +843,7 @@ export async function ingestSnapshot(profile: Profile, result: ExtractResult, do
     }
   }
 
-  if (prev) {
+  if (prev && trusted) {
     const d = diffSnapshots(prev.items, items);
     for (let added of d.added) {
       if (mine.has(added.itemId) || notMine.has(added.itemId)) continue;
@@ -1035,10 +1053,13 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
     switch (msg.type) {
       case "run:now": {
         // Both paths go through runAll, so a single-profile check reports progress and closes the
-        // background window the same way a full run does.
+        // background window the same way a full run does. `ran` is false when one was already
+        // going: the caller asked for a check and did not get one, and should be told so rather
+        // than left reading a snapshot that was never taken.
         const m = msg as Extract<Message, { type: "run:now" }>;
+        if (running) return { ok: true, ran: false };
         await runAll(m.profileKey ? [m.profileKey] : undefined);
-        return { ok: true };
+        return { ok: true, ran: true };
       }
       case "profile:add": {
         const m = msg as Extract<Message, { type: "profile:add" }>;
@@ -1046,7 +1067,10 @@ chrome.runtime.onMessage.addListener((msg: Message | { type: string }, sender, s
         if (!det) return { ok: false, error: "Not a recognized profile URL" };
         const profile: Profile = { platform: det.platform, profileId: det.profileId, url: det.url, addedAt: new Date().toISOString(), watchOnly: m.watchOnly };
         await storage.update("profiles", (all) => ({ ...all, [keyOf(profile)]: all[keyOf(profile)] ?? profile }));
-        void runProfile(profile, false);
+        // Adding is adding. It used to start a check of its own straight through runProfile, which
+        // ignored the one-at-a-time guard, so its lines landed in whatever sweep was already
+        // running and adding one page looked like it had gone and scanned them all. Callers that
+        // want it read now say so with run:now, which takes its turn like everything else.
         return { ok: true, profileKey: keyOf(profile) };
       }
       case "profile:watchOnly": {

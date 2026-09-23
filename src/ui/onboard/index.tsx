@@ -217,7 +217,8 @@ function Wizard() {
       // Add as a watched profile and run once; the background does the fetch/render.
       await send({ type: "profile:add", url: u, watchOnly: fan });
       const key = `${det.platform}:${det.profileId}`;
-      await send({ type: "run:now", profileKey: key });
+      const kicked = await send<{ ok: boolean; ran?: boolean }>({ type: "run:now", profileKey: key });
+      if (kicked.ran === false) throw new Error("A check is already running. Give it a moment and try again.");
       const snaps = await storage.get("snapshots");
       const snap = snaps[key];
       const profiles = await storage.get("profiles");

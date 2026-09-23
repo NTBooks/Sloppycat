@@ -44,19 +44,21 @@ function settle(timeoutMs: number): Promise<void> {
  */
 const EXPAND_BUDGET_MS = 45_000;
 
-async function expandAmazon(): Promise<void> {
+/** @returns true when the grid ran out of "Show more", false when the clock did. */
+async function expandAmazon(): Promise<boolean> {
   const deadline = Date.now() + EXPAND_BUDGET_MS;
   const count = () => document.querySelectorAll('a[class*="ProductGridItem__overlay"]').length;
   for (let i = 0; i < 30 && Date.now() < deadline; i++) {
     const btn = [...document.querySelectorAll<HTMLButtonElement>("button.ShowMore, button")].find(
       (b) => /show more/i.test(b.textContent ?? "") && !b.disabled && b.offsetParent !== null,
     );
-    if (!btn) return;
+    if (!btn) return true;
     const before = count();
     btn.click();
     while (Date.now() < deadline && count() === before) await sleep(250);
-    if (count() === before) return;
+    if (count() === before) return true;
   }
+  return false;
 }
 
 if (!window.__sloppycatExtractInstalled) {
@@ -79,7 +81,8 @@ if (!window.__sloppycatExtractInstalled) {
       try {
         const ex = extractors[platform];
         if (!ex) throw new Error(`No extractor for ${platform}`);
-        answer({ ok: true, result: ex(document, location.href, profileId, new Date().toISOString()) });
+        // Cut short by definition, so it says so.
+        answer({ ok: true, result: { ...ex(document, location.href, profileId, new Date().toISOString()), partial: true } });
       } catch (e) {
         answer({ ok: false, error: e instanceof Error ? e.message : String(e) });
       }
@@ -88,8 +91,13 @@ if (!window.__sloppycatExtractInstalled) {
       const ex = extractors[platform];
       if (!ex) throw new Error(`No extractor for ${platform}`);
       await settle(6000);
-      if (platform === "amazon" && /\/allbooks/.test(location.pathname)) await expandAmazon();
-      answer({ ok: true, result: ex(document, location.href, profileId, new Date().toISOString()) });
+      // Whether the whole grid was reached decides whether the snapshot can be trusted as a
+      // complete list, which decides whether anything new in it is really new.
+      let whole = true;
+      if (platform === "amazon" && /\/allbooks/.test(location.pathname)) whole = await expandAmazon();
+      const result = ex(document, location.href, profileId, new Date().toISOString());
+      if (!whole) result.partial = true;
+      answer({ ok: true, result });
     })()
       .catch((e: unknown) => answer({ ok: false, error: e instanceof Error ? e.message : String(e) }))
       .finally(() => window.clearTimeout(giveUp));

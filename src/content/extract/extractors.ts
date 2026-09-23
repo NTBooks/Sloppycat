@@ -219,7 +219,18 @@ export const extractAmazon: Extractor = (doc, url, profileId, now) => {
     }
   }
 
-  const displayName = textOf(doc.querySelector("h1")) || undefined;
+  /**
+   * The author's name, from the store header rather than the first h1 on the page. Amazon's own
+   * furniture carries headings too - the help chat panel has one - so a bare h1 lookup named an
+   * author "Chat history". Anything that is plainly not a name is refused rather than shown.
+   */
+  const NOT_A_NAME = /^(chat history|results|search|amazon|your books|all books|shop books|customer service)$/i;
+  const nameEl =
+    doc.querySelector('[class*="StoreHeader"] h1, [data-testid*="storeHeader"] h1, #storeHeader h1') ??
+    doc.querySelector('a[class*="AuthorName"], [class*="author-name"]') ??
+    doc.querySelector("h1");
+  const candidate = textOf(nameEl);
+  const displayName = candidate && !NOT_A_NAME.test(candidate) ? candidate : undefined;
   const bioEl = doc.querySelector(
     '[class*="AuthorBio__author-bio__author-biography"], [id^="AuthorBio-author-bio-"], [id^="author-biotile-"], #author-bio, .author-bio',
   );
