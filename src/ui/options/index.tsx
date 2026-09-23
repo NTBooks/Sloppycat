@@ -137,14 +137,6 @@ function General() {
       <h2>Monitoring</h2>
       <div class="row" style="gap:20px">
         <div>
-          <label>Mode</label>
-          <select value={settings.mode} onChange={(e) => void setSettings({ ...settings, mode: (e.target as HTMLSelectElement).value as typeof settings.mode })}>
-            <option value="both">Watch pages + badge them</option>
-            <option value="creator">Watch pages only</option>
-            <option value="consumer">Badge pages only</option>
-          </select>
-        </div>
-        <div>
           <label>Check every (minutes, min 15)</label>
           <input
             type="number"

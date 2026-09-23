@@ -244,7 +244,6 @@ export interface Experiments {
 export const DEFAULT_EXPERIMENTS: Experiments = { blocker: false, blockFlagged: false, slopscan: false, lookalikeSearch: false };
 
 export interface Settings {
-  mode: "creator" | "consumer" | "both";
   intervalMinutes: number; // >= 15
   lookalikeEveryNRuns: number;
   notifications: boolean;
@@ -260,7 +259,6 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  mode: "both",
   intervalMinutes: 60,
   lookalikeEveryNRuns: 6,
   notifications: true,

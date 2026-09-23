@@ -178,10 +178,10 @@ function rebadgeAll() {
 
 async function init() {
   if (!platform) return;
-  type S = { mode?: string; experiments?: { blocker?: boolean; blockFlagged?: boolean } };
+  type S = { experiments?: { blocker?: boolean; blockFlagged?: boolean } };
   const apply = (s: S | undefined) => {
-    // Badging is an experiment, off by default, and never runs in creator-only mode.
-    enabled = !!s?.experiments?.blocker && s?.mode !== "creator";
+    // Badging is an experiment and off by default, which is the only switch it needs.
+    enabled = !!s?.experiments?.blocker;
     blockFlagged = enabled && !!s?.experiments?.blockFlagged;
   };
   const { settings } = (await chrome.storage.local.get("settings")) as { settings?: S };

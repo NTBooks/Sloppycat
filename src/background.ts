@@ -374,60 +374,96 @@ function paint(heading: string, detail: string, iconUrl: string): void {
   icon.href = iconUrl;
   document.head?.appendChild(icon);
 
+  // Keyframes cannot be written inline, so the spinner needs a stylesheet. Added once.
+  if (!document.getElementById(ID + "-style")) {
+    const style = document.createElement("style");
+    style.id = ID + "-style";
+    style.textContent =
+      "@keyframes sloppycat-spin{to{transform:rotate(360deg)}}" +
+      "#" + ID + " .sc-spin{animation:sloppycat-spin 0.9s linear infinite}" +
+      "@media (prefers-reduced-motion:reduce){#" + ID + " .sc-spin{animation:none;opacity:0.6}}";
+    (document.head ?? document.documentElement).appendChild(style);
+  }
+
   let el = document.getElementById(ID);
   if (!el) {
     el = document.createElement("div");
     el.id = ID;
     el.setAttribute("role", "status");
+    // Translucent, so the page being examined stays visible behind the sign. Seeing the work
+    // happen is what makes it read as deliberate rather than as something covering its tracks.
     el.style.cssText = [
       "position:fixed",
       "inset:0",
       "z-index:2147483647",
-      "background:#0f0f10",
-      "color:#f4f4f5",
+      "background:rgba(9,9,11,0.72)",
+      "backdrop-filter:blur(2px)",
+      "-webkit-backdrop-filter:blur(2px)",
       "display:flex",
-      "flex-direction:column",
       "align-items:center",
       "justify-content:center",
-      "gap:10px",
-      "padding:32px",
-      "text-align:center",
+      "padding:24px",
       "font:14px/1.6 system-ui,-apple-system,Segoe UI,sans-serif",
     ].join(";");
     (document.body ?? document.documentElement).appendChild(el);
   }
   el.textContent = "";
 
+  const card = document.createElement("div");
+  card.style.cssText = [
+    "background:#131316",
+    "border:1px solid #2a2a30",
+    "border-radius:14px",
+    "box-shadow:0 18px 50px rgba(0,0,0,0.55)",
+    "padding:26px 30px",
+    "max-width:560px",
+    "display:flex",
+    "flex-direction:column",
+    "align-items:center",
+    "gap:10px",
+    "text-align:center",
+    "color:#f4f4f5",
+  ].join(";");
+  el.appendChild(card);
+
+  // Icon and spinner together: the spinner is the part that says this is still going.
+  const top = document.createElement("div");
+  top.style.cssText = "display:flex;align-items:center;gap:12px";
   const img = document.createElement("img");
   img.src = iconUrl;
   img.alt = "";
-  img.width = 56;
-  img.height = 56;
-  img.style.cssText = "margin-bottom:4px";
-  el.appendChild(img);
+  img.width = 40;
+  img.height = 40;
+  top.appendChild(img);
+  const spin = document.createElement("div");
+  spin.className = "sc-spin";
+  spin.style.cssText =
+    "width:20px;height:20px;border-radius:50%;border:2px solid #3f3f46;border-top-color:#e8a33d;flex:none";
+  top.appendChild(spin);
+  card.appendChild(top);
 
   // The name first. Someone who finds this window needs to know whose it is before anything else.
   const brand = document.createElement("div");
-  brand.style.cssText = "font-size:20px;font-weight:650;letter-spacing:-0.01em";
+  brand.style.cssText = "font-size:19px;font-weight:650;letter-spacing:-0.01em";
   brand.textContent = "Sloppycat";
-  el.appendChild(brand);
+  card.appendChild(brand);
 
   const d = document.createElement("div");
   d.style.cssText = "max-width:48ch;color:#e4e4e7";
   d.textContent = detail;
-  el.appendChild(d);
+  card.appendChild(d);
 
   const where = document.createElement("div");
   where.style.cssText =
-    "max-width:60ch;color:#a1a1aa;font-size:12px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all";
+    "max-width:56ch;color:#a1a1aa;font-size:12px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all";
   where.textContent = heading;
-  el.appendChild(where);
+  card.appendChild(where);
 
   const foot = document.createElement("div");
-  foot.style.cssText = "max-width:48ch;color:#71717a;font-size:12px;margin-top:6px";
+  foot.style.cssText = "max-width:48ch;color:#71717a;font-size:12px;margin-top:4px";
   foot.textContent =
-    "This window belongs to the Sloppycat extension. It opened itself to read a public page and closes on its own. Nothing is sent anywhere. Closing it stops the check.";
-  el.appendChild(foot);
+    "This window belongs to the Sloppycat extension. It opened itself to read the page behind this panel and closes on its own. Nothing is sent anywhere. Closing it stops the check.";
+  card.appendChild(foot);
 }
 
 /**
@@ -582,7 +618,6 @@ export async function runAll(profileKeys?: string[]): Promise<void> {
   running = true;
   try {
     const settings = await storage.get("settings");
-    if (settings.mode === "consumer") return;
     const profiles = await storage.get("profiles");
     const queue = (profileKeys ?? Object.keys(profiles)).filter((k) => profiles[k]);
     const startedAt = new Date().toISOString();

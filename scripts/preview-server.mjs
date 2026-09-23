@@ -12,7 +12,7 @@ const STUB = `
 <script>
 // Minimal chrome.* stub with seeded data, for rendering checks only.
 const store = {
-  settings: { mode: "both", intervalMinutes: 60, lookalikeEveryNRuns: 6, notifications: true, listUpdates: true, defaultDisclosure: { text: "human" }, myListUrl: "https://gist.githubusercontent.com/jane/abc/raw" },
+  settings: { intervalMinutes: 60, lookalikeEveryNRuns: 6, notifications: true, listUpdates: true, defaultDisclosure: { text: "human" }, myListUrl: "https://gist.githubusercontent.com/jane/abc/raw" },
   profiles: {
     "spotify:3yY2gUcIsjMr8hjo51PoJ8": { platform: "spotify", profileId: "3yY2gUcIsjMr8hjo51PoJ8", url: "https://open.spotify.com/artist/3yY2gUcIsjMr8hjo51PoJ8", displayName: "The Smiths", addedAt: "2026-09-20T10:00:00Z", lastRunAt: "2026-09-22T12:00:00Z", verified: true },
     "amazon:www.amazon.com|B001IGFHW6": { platform: "amazon", profileId: "www.amazon.com|B001IGFHW6", url: "https://www.amazon.com/stores/author/B001IGFHW6", displayName: "Jane Doe", addedAt: "2026-09-20T10:00:00Z", lastRunAt: "2026-09-22T12:00:00Z", watchOnly: true, verifiedListUrl: "https://gist.githubusercontent.com/janedoe/def/raw", lastError: "Bot challenge at https://www.amazon.com/stores/author/B001IGFHW6/allbooks" }

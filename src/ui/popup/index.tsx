@@ -7,7 +7,7 @@ import { detectProfile } from "../../adapters";
 import { PLATFORM_LABEL, type Platform } from "../../types";
 
 function Popup() {
-  const [settings, setSettings] = useStorage("settings");
+  const [settings] = useStorage("settings");
   const [profiles] = useStorage("profiles");
   const [alerts] = useStorage("alerts");
   const [changes] = useStorage("listChanges");
@@ -28,7 +28,6 @@ function Popup() {
   const open = Object.values(alerts ?? {}).filter((a) => !a.resolution).length;
   const unseen = (changes ?? []).filter((c) => !c.seen).length;
   const nProfiles = Object.keys(profiles ?? {}).length;
-  const mode = settings?.mode ?? "both";
 
   return (
     <div class="pop stack">
@@ -93,17 +92,6 @@ function Popup() {
         <div class="stat">
           <span>List updates</span>
           <strong>{unseen}</strong>
-        </div>
-        <div class="stat">
-          <span>Mode</span>
-          <select
-            value={mode}
-            onChange={(e) => settings && void setSettings({ ...settings, mode: (e.target as HTMLSelectElement).value as typeof mode })}
-          >
-            <option value="both">Watch pages + badge them</option>
-            <option value="creator">Watch pages only</option>
-            <option value="consumer">Badge pages only</option>
-          </select>
         </div>
       </div>
 
