@@ -40,9 +40,10 @@ rendered against your own session. Neither can be put in an invisible frame: Ama
 `X-Frame-Options: SAMEORIGIN` and Spotify's CSP sets `frame-ancestors 'self'`, so an offscreen document is not
 an option and a page is the only thing left. It is one reused tab in one minimized window of its own, never a
 tab in a window you are working in, and it closes when the check finishes. Chrome gives an extension a window
-with no address bar and no tab strip, which is the shape of a phishing window, so it carries a panel saying
-whose window it is and what it is doing, over a dimmed view of the page being read, with a spinner while the
-check is running. The title and favicon are changed to match. Nothing about reading the page changes. Apple Music, Deezer, Google Books
+with no address bar and no tab strip, which is the shape of a phishing window, so it carries a panel naming
+the extension, the address it is reading and the fact that it closes itself, over a dimmed view of that page,
+with a spinner while the check runs. The title and favicon are changed to match. Nothing about reading the
+page changes. Apple Music, Deezer, Google Books
 and Goodreads need none of this and are fetched directly. If you close the window mid-check, the check says so
 and tries again next time. There is also a ceiling on page loads per check, so a bug upstream stops rather than
 opening pages in a stream.

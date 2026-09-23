@@ -447,22 +447,18 @@ function paint(heading: string, detail: string, iconUrl: string): void {
   brand.textContent = "Sloppycat";
   card.appendChild(brand);
 
-  const d = document.createElement("div");
-  d.style.cssText = "max-width:48ch;color:#e4e4e7";
-  d.textContent = detail;
-  card.appendChild(d);
-
   const where = document.createElement("div");
   where.style.cssText =
     "max-width:56ch;color:#a1a1aa;font-size:12px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all";
   where.textContent = heading;
   card.appendChild(where);
 
-  const foot = document.createElement("div");
-  foot.style.cssText = "max-width:48ch;color:#71717a;font-size:12px;margin-top:4px";
-  foot.textContent =
-    "This window belongs to the Sloppycat extension. It opened itself to read the page behind this panel and closes on its own. Nothing is sent anywhere. Closing it stops the check.";
-  card.appendChild(foot);
+  // One line. Whose window it is and that it goes away by itself is the whole message; why it is
+  // scanning is something the person who set it scanning already knows.
+  const d = document.createElement("div");
+  d.style.cssText = "color:#71717a;font-size:12px";
+  d.textContent = `${detail}. This window closes itself.`;
+  card.appendChild(d);
 }
 
 /**
@@ -499,7 +495,7 @@ function render(url: string, platform: Platform, profileId: string): Promise<Ext
       // stray tab left behind if the worker is stopped between opening and closing it.
       await log(`Loading ${short(url)}`);
       const where = short(url);
-      const why = "Checking a page you watch for releases the artist did not publish.";
+      const why = "Scanning";
       // Re-applied on every navigation event for this tab: each one repaints the page and takes the
       // sign with it. The listener goes at the end of the render.
       const repaint = (id: number) => {
@@ -511,7 +507,7 @@ function render(url: string, platform: Platform, profileId: string): Promise<Ext
         await showCurtain(tabId, where, why);
         await waitForLoad(tabId, 20000);
         await log("Page loaded, letting it settle");
-        await showCurtain(tabId, where, "The page has loaded. Reading the catalogue from it now.");
+        await showCurtain(tabId, where, "Reading the page");
         await new Promise((r) => setTimeout(r, 1500));
         return await extractFromTab(tabId, platform, profileId);
       } finally {
