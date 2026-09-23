@@ -67,3 +67,22 @@ describe("Deezer adapter", () => {
     expect(r.items.every((i) => i.firstSeen === ctx.now)).toBe(true);
   });
 });
+
+describe("Deezer credits the artist even when the response does not", () => {
+  // Deezer omits `artist` from the albums of an artist fetched by id, because it would repeat on
+  // every row. Without a fallback the alert card names no artist, which is the thing that makes a
+  // card unreadable: you cannot tell your own record from somebody else's copy of it.
+  it("falls back to the artist the profile belongs to", async () => {
+    const page = { data: [{ id: 1, title: "Texis", record_type: "album", release_date: "2021-09-10" }] };
+    mockFetch({ "api.deezer.com/artist/399/albums": page, "api.deezer.com/artist/399": { name: "Sleigh Bells" } });
+    const r = await deezer.fetchSnapshot("399", ctx);
+    expect(r.items[0]!.subtitle).toBe("Sleigh Bells");
+  });
+
+  it("prefers what the response says when it does say", async () => {
+    const page = { data: [{ id: 2, title: "Split", record_type: "album", artist: { name: "Somebody Else" } }] };
+    mockFetch({ "api.deezer.com/artist/399/albums": page, "api.deezer.com/artist/399": { name: "Sleigh Bells" } });
+    const r = await deezer.fetchSnapshot("399", ctx);
+    expect(r.items[0]!.subtitle).toBe("Somebody Else");
+  });
+});

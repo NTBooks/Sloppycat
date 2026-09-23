@@ -64,9 +64,15 @@ grant it, rather than a fetch that fails for reasons nobody can see.
 have to come from you or your distributor. ISBNs do appear on book pages and get read. ASIN churn is covered
 in [the identifier notes](../research/identifiers.md).
 
+**Google Books answers without a key, until it doesn't.** The volumes API is called anonymously, and the
+keyless daily quota is shared by everyone calling it that way, so it returns HTTP 429 fairly often through no
+fault of yours. That surfaces as an error on the profile rather than an empty catalogue, which is the
+important part: it never reads as "this author has no books". Checked 2026-09-22, when it was over quota.
+
 **Catalogue depth is capped per platform.** Apple's lookup returns up to 200 collections, Deezer paging stops
 at 1000 albums, the Goodreads adapter reads 10 pages of 30. Prolific back catalogues will exceed those and
-need paging work.
+need paging work. Only Spotify reports a total to compare against, so only Spotify can tell you it saw fewer
+than exist; on the others a truncated catalogue is silent.
 
 **Lookalike search is shallow.** It checks your three most recent titles, every sixth run, on the platforms
 that can search. A clone of an older title won't be found unless someone reports it.

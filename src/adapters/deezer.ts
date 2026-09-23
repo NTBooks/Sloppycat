@@ -33,12 +33,17 @@ function kindOf(t: string | undefined): ItemKind {
   }
 }
 
-function toItem(a: DeezerAlbum, now: string, source: "profile" | "search"): SnapshotItem {
+/**
+ * @param fallbackArtist who to credit when the response does not say. Deezer omits `artist` from
+ *   the albums of an artist you asked for by id, since it would be the same name on every row, so
+ *   without this an alert card for a Deezer release names no artist at all.
+ */
+function toItem(a: DeezerAlbum, now: string, source: "profile" | "search", fallbackArtist?: string): SnapshotItem {
   return {
     platform: "deezer",
     itemId: String(a.id),
     title: a.title,
-    subtitle: a.artist?.name,
+    subtitle: a.artist?.name ?? fallbackArtist,
     kind: kindOf(a.record_type),
     releaseDate: a.release_date,
     label: a.label,
@@ -71,7 +76,7 @@ export const deezer: Adapter = {
     let guard = 0;
     while (url && guard++ < 10) {
       const page: DeezerPage<DeezerAlbum> = await fetchJson<DeezerPage<DeezerAlbum>>(url);
-      for (const a of page.data) items.push(toItem(a, ctx.now, "profile"));
+      for (const a of page.data) items.push(toItem(a, ctx.now, "profile", artist.name));
       url = page.next;
     }
     return { platform: "deezer", profileId, displayName: artist.name, items };
